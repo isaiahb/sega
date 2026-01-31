@@ -15,6 +15,8 @@ import { BroadcastManager } from "./BroadcastManager";
 import { DisplayManager } from "./DisplayManager";
 import { SettingsManager } from "./SettingsManager";
 import { MeetingManager } from "./MeetingManager";
+import { AgentManager } from "./AgentManager";
+import { NotesManager } from "./NotesManager";
 
 /**
  * Logger interface for session logging
@@ -122,9 +124,13 @@ export class UserSession {
   /** Meeting lifecycle and tracking */
   readonly meeting: MeetingManager;
 
-  // TODO: Add these managers in Phase 2+
-  // readonly agent: AgentManager;
-  // readonly notes: NotesManager;
+  /** AI agent - the brain that orchestrates SEGA */
+  readonly agent: AgentManager;
+
+  /** Note generation and action item extraction */
+  readonly notes: NotesManager;
+
+  // TODO: Add in Phase 3
   // readonly research: ResearchManager;
 
   /** Whether the session has been initialized */
@@ -175,6 +181,29 @@ export class UserSession {
       transcript: this.transcript,
       broadcast: this.broadcast,
       display: this.display,
+    });
+
+    // NotesManager needs userId, logger, transcript, meeting, settings, broadcast, display
+    this.notes = new NotesManager({
+      userId: this.userId,
+      logger: this.logger,
+      transcript: this.transcript,
+      meeting: this.meeting,
+      settings: this.settings,
+      broadcast: this.broadcast,
+      display: this.display,
+    });
+
+    // AgentManager needs userId, logger, transcript, meeting, settings, broadcast, display, notes
+    this.agent = new AgentManager({
+      userId: this.userId,
+      logger: this.logger,
+      transcript: this.transcript,
+      meeting: this.meeting,
+      settings: this.settings,
+      broadcast: this.broadcast,
+      display: this.display,
+      notes: this.notes,
     });
 
     this.logger.info(`[UserSession] Created for ${userId}`);
@@ -230,6 +259,9 @@ export class UserSession {
 
       // TODO: Load any persisted state (active meeting, etc.)
 
+      // Start the agent analysis loop
+      this.agent.start();
+
       this.initialized = true;
       this.logger.info("[UserSession] Initialized successfully");
 
@@ -260,6 +292,8 @@ export class UserSession {
 
     try {
       // Dispose managers in reverse order of dependency
+      this.agent.dispose();
+      this.notes.dispose();
       this.meeting.dispose();
       this.settings.dispose();
       this.display.dispose();
@@ -284,17 +318,17 @@ export class UserSession {
     if (this.disposed) return;
 
     // Add to transcript buffer
-    this.transcript.addSegment(text, isFinal, speakerId);
+    const segment = this.transcript.addSegment(text, isFinal, speakerId);
 
     // Show on glasses (if enabled)
     if (isFinal && this.display.isTranscriptEnabled()) {
       this.display.showTranscript(text);
     }
 
-    // TODO: Notify AgentManager for analysis
-    // if (isFinal) {
-    //   this.agent.onNewTranscript(segment);
-    // }
+    // Notify AgentManager for analysis
+    if (isFinal) {
+      this.agent.onNewTranscript(segment);
+    }
   }
 
   // ===========================================================================

@@ -14,6 +14,8 @@ export { DisplayManager } from "./DisplayManager";
 export type { DisplayPriority } from "./DisplayManager";
 export { SettingsManager } from "./SettingsManager";
 export { MeetingManager } from "./MeetingManager";
+export { AgentManager } from "./AgentManager";
+export { NotesManager } from "./NotesManager";
 
 // Types
 export type {
