@@ -1,29 +1,22 @@
 import React, { useState } from 'react';
-import {
-  Kanban,
-  List,
-  Filter,
-  Plus,
-  MoreHorizontal,
-  CheckCircle2,
-  Circle,
-  Clock
+import { 
+  Kanban, 
+  List, 
+  Filter, 
+  Plus, 
+  MoreHorizontal, 
+  CheckCircle2, 
+  Circle, 
+  Clock, 
+  User 
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { mockFolders } from '../lib/mockData';
+import { mockFolders } from '@/app/lib/mockData';
 
 // Flatten actions from notes for demo
-const allActions = mockFolders.flatMap(f =>
-  (f.notes || []).flatMap(n =>
-    n.actionItems.map(a => ({
-      ...a,
-      noteTitle: n.title,
-      date: f.date
-    }))
-  )
-);
+const allActions = mockFolders.flatMap(f => (f.notes || []).flatMap(n => n.actionItems.map(a => ({ ...a, noteTitle: n.title, date: f.date }))));
 
-export const ActionsView: React.FC = () => {
+export const ActionsView = () => {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   return (
@@ -34,7 +27,7 @@ export const ActionsView: React.FC = () => {
                <h1 className="text-lg font-bold text-zinc-900 dark:text-white">Action Items</h1>
                <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
                <div className="flex bg-zinc-100 dark:bg-zinc-900 rounded-lg p-0.5">
-                   <button
+                   <button 
                       onClick={() => setViewMode('list')}
                       className={clsx(
                           "p-1.5 rounded-md transition-all",
@@ -43,7 +36,7 @@ export const ActionsView: React.FC = () => {
                    >
                        <List size={16} />
                    </button>
-                   <button
+                   <button 
                       onClick={() => setViewMode('kanban')}
                       className={clsx(
                           "p-1.5 rounded-md transition-all",
@@ -54,7 +47,7 @@ export const ActionsView: React.FC = () => {
                    </button>
                </div>
            </div>
-
+           
            <div className="flex items-center gap-3">
                <button className="flex items-center gap-2 px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
                    <Filter size={16} />
@@ -69,7 +62,7 @@ export const ActionsView: React.FC = () => {
 
        {/* Content */}
         <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6">
-
+           
            {viewMode === 'list' ? (
                <div className="max-w-5xl mx-auto bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                    {/* Table Header */}
@@ -80,7 +73,7 @@ export const ActionsView: React.FC = () => {
                        <div className="col-span-2">Due Date</div>
                        <div className="col-span-1 text-right">Status</div>
                    </div>
-
+                   
                    {/* Rows */}
                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                        {allActions.length > 0 ? allActions.map((action, i) => (
@@ -98,7 +91,7 @@ export const ActionsView: React.FC = () => {
                                        </div>
                                    </div>
                                </div>
-
+                               
                                <div className="col-span-2">
                                     {action.priority === 'high' && (
                                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30">
@@ -125,8 +118,8 @@ export const ActionsView: React.FC = () => {
                                </div>
 
                                <div className="col-span-2">
-                                   <span className={clsx("text-sm", action.dueDate ? "text-zinc-600 dark:text-zinc-400" : "text-zinc-400 dark:text-zinc-600")}>
-                                       {action.dueDate ? action.dueDate.toLocaleDateString() : 'No Date'}
+                                   <span className={clsx("text-sm", action.date ? "text-zinc-600 dark:text-zinc-400" : "text-zinc-400 dark:text-zinc-600")}>
+                                       {action.date ? action.date.toLocaleDateString() : 'No Date'}
                                    </span>
                                </div>
 
@@ -166,7 +159,7 @@ export const ActionsView: React.FC = () => {
                                        {columnItems.length}
                                    </span>
                                </div>
-
+                               
                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-hide">
                                    {columnItems.map((item, idx) => (
                                        <div key={idx} className="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
@@ -183,24 +176,24 @@ export const ActionsView: React.FC = () => {
                                                     <MoreHorizontal size={14} />
                                                 </button>
                                             </div>
-
+                                            
                                             <p className={clsx("text-sm font-medium mb-3 line-clamp-2", item.done ? "text-zinc-500 line-through" : "text-zinc-900 dark:text-white")}>
                                                 {item.text}
                                             </p>
-
+                                            
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                                                     <Clock size={12} />
-                                                    <span>{item.dueDate ? item.dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No Date'}</span>
+                                                    <span>{item.date ? item.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No Date'}</span>
                                                 </div>
-
+                                                
                                                 <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-[8px] font-bold text-indigo-600 dark:text-indigo-400 ring-1 ring-white dark:ring-black">
                                                     {item.owner ? item.owner.substring(0, 1) : 'Y'}
                                                 </div>
                                             </div>
                                        </div>
                                    ))}
-
+                                   
                                    <button className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-white dark:hover:bg-zinc-800 transition-colors">
                                        + Add Task
                                    </button>

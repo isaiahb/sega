@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import {
-  LifeBuoy,
-  Search,
-  Book,
-  MessageCircle,
-  Server,
-  ChevronDown,
-  Mail,
+import { 
+  LifeBuoy, 
+  ExternalLink, 
+  Search, 
+  Book, 
+  MessageCircle, 
+  Server, 
+  ChevronDown, 
+  ChevronRight, 
+  Mail, 
+  FileText,
   Zap,
   Shield,
   CreditCard,
@@ -19,7 +22,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 
   return (
     <div className="border-b border-zinc-200 dark:border-zinc-800 last:border-0">
-      <button
+      <button 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between py-4 text-left group"
       >
@@ -33,7 +36,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
           <ChevronDown size={18} />
         </div>
       </button>
-      <div
+      <div 
         className={clsx(
           "overflow-hidden transition-all duration-300 ease-in-out",
           isOpen ? "max-h-48 opacity-100 pb-4" : "max-h-0 opacity-0"
@@ -47,10 +50,10 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
   );
 };
 
-export const HelpView: React.FC = () => {
+export const HelpView = () => {
   return (
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-black overflow-hidden">
-
+      
       {/* Header with Search */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-8 pb-12">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -69,7 +72,7 @@ export const HelpView: React.FC = () => {
             </div>
             <input
               type="text"
-              className="w-full pl-11 pr-4 py-3 bg-zinc-100 dark:bg-zinc-800 border-none rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:outline-none transition-all shadow-sm"
+              className="w-full pl-11 pr-4 py-3 bg-zinc-100 dark:bg-zinc-800 border-none rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-all shadow-sm"
               placeholder="Search for articles, guides, and troubleshooting..."
             />
           </div>
@@ -88,7 +91,7 @@ export const HelpView: React.FC = () => {
                { icon: MessageCircle, title: "Community", desc: "Join the chat" },
                { icon: Server, title: "System Status", desc: "All operational", color: "text-emerald-500" },
              ].map((item, i) => (
-               <button
+               <button 
                   key={i}
                   className="flex flex-col items-start p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-blue-500/50 hover:shadow-md transition-all group text-left"
                >
@@ -117,21 +120,21 @@ export const HelpView: React.FC = () => {
                  <LifeBuoy className="text-blue-500" size={20} />
                  Frequently Asked Questions
                </h2>
-
+               
                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 px-6 py-2 shadow-sm">
-                  <FAQItem
+                  <FAQItem 
                     question="How do I connect my calendar?"
                     answer="Navigate to Settings > Integrations > Google Calendar. Click 'Connect' and follow the OAuth flow to sync your meetings."
                   />
-                  <FAQItem
+                  <FAQItem 
                     question="Is my audio data private?"
                     answer="Yes. All audio processing happens locally on your device or via our encrypted private cloud (depending on your settings). We do not train on your data."
                   />
-                  <FAQItem
+                  <FAQItem 
                     question="Can I export my research notes?"
                     answer="Absolutely. You can export to Markdown, PDF, or directly to Notion/Linear from the Actions menu in any note."
                   />
-                  <FAQItem
+                  <FAQItem 
                     question="How does the glasses HUD work?"
                     answer="Ensure your Even Realities G1 glasses are paired via Bluetooth. The HUD preview will automatically activate when a session starts."
                   />
@@ -140,7 +143,7 @@ export const HelpView: React.FC = () => {
 
             {/* Right Column: Topics & Contact */}
             <div className="space-y-8">
-
+              
               {/* Browse Topics */}
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Browse by Topic</h2>
@@ -164,12 +167,12 @@ export const HelpView: React.FC = () => {
                   <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                     <LifeBuoy size={120} />
                   </div>
-
+                  
                   <h3 className="text-lg font-bold mb-2 relative z-10">Still need help?</h3>
                   <p className="text-blue-100 text-sm mb-6 relative z-10 max-w-[80%]">
                     Our engineering support team is available Mon-Fri, 9am-6pm PST.
                   </p>
-
+                  
                   <button className="flex items-center gap-2 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm relative z-10">
                      <Mail size={16} />
                      Contact Support
@@ -178,7 +181,7 @@ export const HelpView: React.FC = () => {
 
             </div>
           </div>
-
+          
           {/* Footer */}
           <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row justify-between items-center text-xs text-zinc-500 dark:text-zinc-500">
             <p>&copy; 2026 Mentra Inc. All rights reserved.</p>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Mic,
-  Square,
+import { 
+  Mic, 
+  Square, 
   Play,
   Sparkles,
   Calendar,
@@ -14,34 +14,10 @@ import {
   List
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useSSE } from '../hooks/useSSE';
-
-// Assets
-import glassesG1 from '../assets/glasses-g1.png';
-import glassesHUD from '../assets/glasses-hud.png';
-
-// Even Realities logo SVG path
-const evenRealitiesSvgPath = "M9.52 0C4.26 0 0 4.26 0 9.52c0 3.82 2.25 7.11 5.5 8.63v-2.41a6.89 6.89 0 01-3.17-5.82c0-3.82 3.1-6.92 6.92-6.92 3.26 0 5.99 2.26 6.72 5.3h2.36C17.56 3.52 13.9 0 9.52 0zm0 16.79c-4.02 0-7.27-3.26-7.27-7.27S5.5 2.25 9.52 2.25s7.27 3.26 7.27 7.27-3.26 7.27-7.27 7.27z";
-
-// --- Types ---
-interface Note {
-  time: string;
-  text: string;
-}
-
-interface ResearchItem {
-  type: 'person' | 'company' | 'market';
-  title: string;
-  subtitle: string;
-  status: 'verified' | 'pending';
-  details: string[];
-}
-
-interface TodayViewProps {
-  onNavigate?: (view: string) => void;
-  userId: string;
-}
+import { motion, AnimatePresence } from 'motion/react';
+import svgPaths from "@/imports/svg-xrkbo2yamu";
+import imgGlassesG11 from "figma:asset/3f76fb251e80cce61cf144dcf30292b48ca0b96a.png";
+import imgGlassesHUD from "figma:asset/b17b2802ab57199b451339b9842859c28c5f8fb8.png";
 
 // --- Components ---
 
@@ -62,8 +38,8 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
               <div className="flex items-center justify-between z-10 w-full">
                 <div className="flex items-center gap-2">
                     <div className="h-4 w-5 relative text-zinc-900 dark:text-white">
-                        <svg className="block size-full" fill="currentColor" viewBox="0 0 19 17">
-                            <path clipRule="evenodd" d={evenRealitiesSvgPath} fillRule="evenodd" />
+                        <svg className="block size-full" fill="currentColor" viewBox="0 0 19.0403 16.7852">
+                            <path clipRule="evenodd" d={svgPaths.p1f5cee00} fillRule="evenodd" />
                         </svg>
                     </div>
                     <span className="font-semibold text-zinc-900 dark:text-white tracking-tight text-sm">Even Realities G1</span>
@@ -76,11 +52,11 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
 
               {/* Center: Hero Image */}
               <div className="relative flex-1 flex items-center justify-center z-10 group-hover:scale-105 transition-transform duration-500 my-1">
-                <motion.img
+                <motion.img 
                     layoutId="glasses-image"
-                    alt="Even Realities G1"
-                    className="w-full h-full object-contain max-h-[90px] drop-shadow-xl transform -rotate-1"
-                    src={glassesG1}
+                    alt="Even Realities G1" 
+                    className="w-full h-full object-contain max-h-[90px] drop-shadow-xl transform -rotate-1" 
+                    src={imgGlassesG11} 
                 />
               </div>
 
@@ -99,7 +75,7 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                      <span className="text-xs font-mono font-medium text-zinc-900 dark:text-white">Active</span>
                  </div>
               </div>
-
+              
               {/* Background Gradient */}
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-zinc-50/30 to-zinc-100/50 dark:via-zinc-800/10 dark:to-zinc-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           </motion.div>
@@ -114,14 +90,14 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
           >
               {/* Left: HUD Visual */}
               <div className="relative w-[60%] flex items-center justify-center">
-                 <img
-                     src={glassesHUD}
-                     alt="HUD View"
-                     className="w-full h-auto object-contain"
+                 <img 
+                     src={imgGlassesHUD} 
+                     alt="HUD View" 
+                     className="w-full h-auto object-contain" 
                  />
-
+                 
                  {/* Text Overlay */}
-                 <div
+                 <div 
                     className="absolute text-left overflow-hidden flex items-center"
                     style={{
                         left: '39.5%',
@@ -130,14 +106,14 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                         bottom: '25%'
                     }}
                  >
-                     <motion.p
+                     <motion.p 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        key={hudText}
+                        key={hudText} // Re-animate on text change
                         className="font-mono text-[#00b869] text-[6px] lg:text-[8px] leading-relaxed whitespace-pre-wrap break-words"
                      >
                          {hudText}
-                         <motion.span
+                         <motion.span 
                             animate={{ opacity: [0, 1, 0] }}
                             transition={{ duration: 0.8, repeat: Infinity }}
                          >_</motion.span>
@@ -146,7 +122,7 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
               </div>
 
               {/* Right: Glasses Information Panel */}
-              <motion.div
+              <motion.div 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
@@ -199,7 +175,7 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
   );
 };
 
-const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem) => {
+const ResearchEntity = ({ type, title, subtitle, details, status }: any) => {
     return (
         <motion.div
             layout
@@ -213,7 +189,7 @@ const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem
                 <div className="flex items-center gap-3">
                     <div className={clsx(
                         "p-2 rounded-lg",
-                        type === 'person' ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" :
+                        type === 'person' ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : 
                         type === 'company' ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600" :
                         "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
                     )}>
@@ -231,9 +207,9 @@ const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem
                     {status}
                 </div>
             </div>
-
+            
             <div className="space-y-2 pl-11">
-                {details.map((detail: string, i: number) => (
+                {details.map((detail: any, i: number) => (
                     <div key={i} className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
                         <div className="mt-0.5 w-1 h-1 rounded-full bg-zinc-400 shrink-0" />
                         <span>{detail}</span>
@@ -244,48 +220,27 @@ const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem
     );
 };
 
-export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
-  const { lastEvent } = useSSE(userId);
+export const TodayView = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
+  
   // Simulated Data
-  const [notes, setNotes] = useState<Note[]>([
+  const [notes, setNotes] = useState<any[]>([
       { time: "10:02", text: "Meeting started. Agenda: Pitch review for 'Lumina' (Generative UI Platform)." },
       { time: "10:03", text: "Speaker introduces himself as Alex Rivera." },
       { time: "10:04", text: "Claim: Lumina reduces frontend dev time by 80% using context-aware LLMs." },
   ]);
-
-  const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
+  
+  const [researchItems, setResearchItems] = useState<any[]>([]);
   const [hudText, setHudText] = useState("");
-
-  // Handle SSE events for real transcription
-  useEffect(() => {
-    if (!lastEvent) return;
-
-    switch (lastEvent.type) {
-      case 'transcription':
-        if (lastEvent.isFinal) {
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-          setNotes(prev => [...prev, { time: timeStr, text: lastEvent.text }]);
-        }
-        setHudText(lastEvent.text || "");
-        break;
-
-      case 'agent_complete':
-        if (lastEvent.response?.glassesDisplay) {
-          setHudText(lastEvent.response.glassesDisplay);
-        }
-        break;
-    }
-  }, [lastEvent]);
-
-  // Scripted demo sequence (when no real SSE data)
+  
+  // Scripted event sequence
   useEffect(() => {
       if (!isRecording) return;
-
+      
+      // Reset HUD initially
       setHudText("Initializing capture...\nListening for entities...");
 
       const sequence = [
@@ -294,10 +249,10 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
               type: 'research',
               hud: "Detecting entity: Person\nRunning background check: 'Alex Rivera'...",
               data: {
-                  type: 'person' as const,
+                  type: 'person',
                   title: "Alex Rivera",
                   subtitle: "Founder & CEO @ Lumina",
-                  status: "verified" as const,
+                  status: "verified",
                   details: [
                       "Ex-Staff Engineer at Stripe (4y). Led the Payments UI team.",
                       "Previous exit: Sold 'StackFlow' to Atlassian in 2021.",
@@ -316,10 +271,10 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
               type: 'research',
               hud: "Analyzing organization: 'Lumina'\nFetching Crunchbase data...",
               data: {
-                  type: 'company' as const,
+                  type: 'company',
                   title: "Lumina",
                   subtitle: "San Francisco, CA • Seed Stage",
-                  status: "verified" as const,
+                  status: "verified",
                   details: [
                       "Raised $4.2M Seed led by Sequoia (Jan 2024).",
                       "Team size: 12 (8 Engineers).",
@@ -332,10 +287,10 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
               type: 'research',
               hud: "Validating market segment: Gen-UI\nComparing against competitors...",
               data: {
-                  type: 'market' as const,
+                  type: 'market',
                   title: "Domain Validation: Gen-UI",
                   subtitle: "Market Analysis & Competitors",
-                  status: "verified" as const,
+                  status: "verified",
                   details: [
                       "CAGR: 35% projected growth for AI code generation tools.",
                       "Competitors: Vercel v0, Bolt.new, Lovable.",
@@ -359,9 +314,9 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                   setHudText(event.hud);
               }
               if (event.type === 'note') {
-                  setNotes(prev => [...prev, event.data as Note]);
+                  setNotes(prev => [...prev, event.data]);
               } else {
-                  setResearchItems(prev => [event.data as ResearchItem, ...prev]);
+                  setResearchItems(prev => [event.data, ...prev]);
               }
           }, event.time * 1000);
           timeouts.push(t);
@@ -403,22 +358,22 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formattedTime = currentTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
+  const formattedTime = currentTime.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
     minute: '2-digit',
-    hour12: false
+    hour12: false 
   });
-
-  const formattedDate = currentTime.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
+  
+  const formattedDate = currentTime.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    month: 'long', 
     day: 'numeric',
     year: 'numeric'
   });
 
   return (
     <div className="flex flex-col h-full bg-zinc-50 dark:bg-black p-6 gap-6 overflow-hidden">
-
+       
        {/* HEADER: Date, Time & Status */}
        <header className="flex items-end justify-between shrink-0 pb-2">
            <div className="flex flex-col gap-1">
@@ -431,7 +386,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                    <span>{formattedDate}</span>
                </div>
            </div>
-
+           
            <div className="flex items-center gap-3">
                <div className="text-right hidden sm:block">
                    <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest">System Status</div>
@@ -440,17 +395,18 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                    </div>
                </div>
                <div className={clsx(
-                   "w-3 h-3 rounded-full shadow-[0_0_10px_currentColor] transition-all duration-500",
+                   "w-3 h-3 rounded-full shadow-[0_0_10px_currentColor] transition-all duration-500", 
                    isRecording ? "bg-red-500 text-red-500 animate-pulse" : "bg-emerald-500 text-emerald-500"
                )} />
            </div>
        </header>
 
        {/* ROW 1: Control & Device (Reduced Height) */}
+       {/* We use LayoutGroup to sync layout changes between these two cards */}
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 shrink-0 h-[200px]">
-
+           
            {/* Live Session Control - DYNAMIC COL SPAN */}
-           <motion.div
+           <motion.div 
                layout
                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                className={clsx(
@@ -461,7 +417,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                 {/* Header */}
                 <div className="flex items-start justify-between z-10">
                     <div className="flex items-center gap-3">
-                        <motion.div
+                        <motion.div 
                             layout
                             className={clsx("p-2.5 rounded-xl transition-colors shrink-0", isRecording ? "bg-red-50 text-red-500" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500")}
                         >
@@ -481,7 +437,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                 <div className="flex-1 flex flex-col items-center justify-center py-6 z-10">
                     <AnimatePresence mode="wait">
                     {isRecording ? (
-                        <motion.div
+                        <motion.div 
                             key="recording-timer"
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -499,7 +455,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                              <span className="text-[10px] text-red-500 font-bold mt-2 uppercase tracking-[0.2em] border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded-full">Recording</span>
                         </motion.div>
                     ) : (
-                        <motion.div
+                        <motion.div 
                             key="idle-state"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.6 }}
@@ -508,9 +464,9 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                         >
                             <div className="flex gap-1">
                                 {[1,2,3,4].map(i => (
-                                    <motion.div
-                                        key={i}
-                                        className="w-1 h-8 bg-zinc-200 dark:bg-zinc-800 rounded-full"
+                                    <motion.div 
+                                        key={i} 
+                                        className="w-1 h-8 bg-zinc-200 dark:bg-zinc-800 rounded-full" 
                                         animate={{ height: [32, 24, 32] }}
                                         transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
                                     />
@@ -524,12 +480,12 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
 
                 {/* Footer - Controls */}
                 <div className="z-10">
-                     <button
+                     <button 
                         onClick={() => setIsRecording(!isRecording)}
                         className={clsx(
                             "absolute bottom-6 left-6 right-6 z-20 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm border",
-                            isRecording
-                                ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400"
+                            isRecording 
+                                ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400" 
                                 : "bg-zinc-900 border-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900"
                         )}
                      >
@@ -543,7 +499,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
            </motion.div>
 
            {/* Device Card - DYNAMIC COL SPAN */}
-           <motion.div
+           <motion.div 
                layout
                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                className={clsx(
@@ -557,7 +513,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
 
        {/* ROW 2: Notes & Research (Fill Remaining Height) */}
        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-3 gap-6">
-
+            
             {/* 1. Live Summary (Left 1/3) */}
             <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col shadow-sm h-full overflow-hidden">
                 <div className="flex items-center justify-between mb-4 shrink-0">
@@ -569,8 +525,8 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                 <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
                     <AnimatePresence initial={false}>
                     {notes.map((note, i) => (
-                        <motion.div
-                            key={i}
+                        <motion.div 
+                            key={i} 
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex gap-3"
@@ -583,7 +539,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                     ))}
                     </AnimatePresence>
                     {isRecording && (
-                        <motion.div
+                        <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             className="flex items-center gap-2 px-0 py-2 text-xs text-zinc-400 pl-11"
@@ -605,7 +561,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                     <div className="flex items-center gap-2">
                         {/* View Toggle */}
                         <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg mr-2 border border-zinc-200 dark:border-zinc-700">
-                            <button
+                            <button 
                                 onClick={() => setViewMode('grid')}
                                 className={clsx(
                                     "p-1.5 rounded-md transition-all",
@@ -614,7 +570,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             >
                                 <LayoutGrid size={14} />
                             </button>
-                            <button
+                            <button 
                                 onClick={() => setViewMode('list')}
                                 className={clsx(
                                     "p-1.5 rounded-md transition-all",
@@ -624,13 +580,13 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                                 <List size={14} />
                             </button>
                         </div>
-
+                        
                         <span className="hidden sm:inline-block text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-md font-medium border border-purple-100 dark:border-purple-800">
                             AUTO-RESEARCH ACTIVE
                         </span>
                     </div>
                 </div>
-
+                
                 <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                     {researchItems.length === 0 && !isRecording ? (
                          <div className="h-full flex flex-col items-center justify-center text-zinc-400 gap-3">
@@ -638,7 +594,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                              <p className="text-sm">Start recording to activate entity research...</p>
                          </div>
                     ) : (
-                        <motion.div
+                        <motion.div 
                             layout
                             className={clsx(
                                 "gap-4",

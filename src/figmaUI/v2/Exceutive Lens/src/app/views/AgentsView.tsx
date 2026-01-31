@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import {
-  Bot,
-  Shield,
-  Sliders,
-  Check,
+import { 
+  Bot, 
+  Shield, 
+  Sliders, 
+  Check, 
   Zap,
   Plus,
   Trash2,
@@ -13,7 +13,7 @@ import { clsx } from 'clsx';
 
 type AgentSection = 'autonomy' | 'classification' | 'sensitive';
 
-export const AgentsView: React.FC = () => {
+export const AgentsView = () => {
   const [activeSection, setActiveSection] = useState<AgentSection>('autonomy');
   const [autonomyLevel, setAutonomyLevel] = useState<'capture' | 'suggest' | 'act'>('suggest');
 
@@ -28,28 +28,28 @@ export const AgentsView: React.FC = () => {
 
   return (
     <div className="flex h-full bg-white dark:bg-black">
-
+      
       {/* Sidebar Navigation */}
       <div className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-4">
          <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4 px-2">Configuration</h2>
          <div className="space-y-1">
-             <NavButton
-                active={activeSection === 'autonomy'}
+             <NavButton 
+                active={activeSection === 'autonomy'} 
                 onClick={() => setActiveSection('autonomy')}
-                icon={Bot}
-                label="Autonomy Levels"
+                icon={Bot} 
+                label="Autonomy Levels" 
             />
-             <NavButton
-                active={activeSection === 'classification'}
+             <NavButton 
+                active={activeSection === 'classification'} 
                 onClick={() => setActiveSection('classification')}
-                icon={Sliders}
-                label="Meeting Classification"
+                icon={Sliders} 
+                label="Meeting Classification" 
             />
-             <NavButton
-                active={activeSection === 'sensitive'}
+             <NavButton 
+                active={activeSection === 'sensitive'} 
                 onClick={() => setActiveSection('sensitive')}
-                icon={Shield}
-                label="Sensitive Topics"
+                icon={Shield} 
+                label="Sensitive Topics" 
             />
          </div>
       </div>
@@ -67,8 +67,8 @@ export const AgentsView: React.FC = () => {
 
 // --- Sub Components ---
 
-const NavButton = ({ icon: Icon, label, active, onClick }: { icon: React.ElementType, label: string, active?: boolean, onClick: () => void }) => (
-    <button
+const NavButton = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active?: boolean, onClick: () => void }) => (
+    <button 
         onClick={onClick}
         className={clsx(
             "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -89,22 +89,22 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
 
         {/* Autonomy Selector */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-            <AutonomyCard
-                title="Capture Only"
+            <AutonomyCard 
+                title="Capture Only" 
                 description="Records and summarizes. No outgoing actions."
                 active={level === 'capture'}
                 onClick={() => setLevel('capture')}
                 icon={Bot}
             />
-            <AutonomyCard
-                title="Suggest"
+            <AutonomyCard 
+                title="Suggest" 
                 description="Drafts emails and researches. Waits for approval."
                 active={level === 'suggest'}
                 onClick={() => setLevel('suggest')}
                 icon={Zap}
             />
-            <AutonomyCard
-                title="Act with Constraints"
+            <AutonomyCard 
+                title="Act with Constraints" 
                 description="Sends internal summaries automatically. Asks for external."
                 active={level === 'act'}
                 onClick={() => setLevel('act')}
@@ -116,19 +116,19 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
         <div className="space-y-6">
             <Section title="Integrations & Permissions">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl divide-y divide-zinc-100 dark:divide-zinc-800">
-                    <IntegrationRow
-                        name="Google Calendar"
-                        status="Connected"
+                    <IntegrationRow 
+                        name="Google Calendar" 
+                        status="Connected" 
                         description="Read-only access to meeting details"
                     />
-                    <IntegrationRow
-                        name="Gmail"
-                        status="Connected"
+                    <IntegrationRow 
+                        name="Gmail" 
+                        status="Connected" 
                         description="Draft creation enabled. Sending requires approval."
                     />
-                    <IntegrationRow
-                        name="Slack"
-                        status="Disconnected"
+                    <IntegrationRow 
+                        name="Slack" 
+                        status="Disconnected" 
                         description="Post summaries to channels"
                         isDisconnected
                     />
@@ -138,19 +138,7 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
     </>
 );
 
-const ClassificationSettings = () => {
-  const [rules, setRules] = useState([
-      { name: "Standups", condition: "Title contains 'Standup' or 'Daily'", category: "Standup", active: true },
-      { name: "External Sales", condition: "Attendees include external domains", category: "External Call", active: true },
-      { name: "1:1s", condition: "Exactly 2 attendees", category: "Personnel", active: true },
-      { name: "Design Reviews", condition: "Title contains 'Design' or 'UX'", category: "Design Review", active: false }
-  ]);
-
-  const toggleRule = (index: number) => {
-    setRules(rules.map((r, i) => i === index ? { ...r, active: !r.active } : r));
-  };
-
-  return (
+const ClassificationSettings = () => (
     <>
         <div className="mb-8">
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Meeting Classification</h1>
@@ -167,7 +155,12 @@ const ClassificationSettings = () => {
                      </tr>
                  </thead>
                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                     {rules.map((rule, i) => (
+                     {[
+                         { name: "Standups", condition: "Title contains 'Standup' or 'Daily'", category: "Standup", active: true },
+                         { name: "External Sales", condition: "Attendees include external domains", category: "External Call", active: true },
+                         { name: "1:1s", condition: "Exactly 2 attendees", category: "Personnel", active: true },
+                         { name: "Design Reviews", condition: "Title contains 'Design' or 'UX'", category: "Design Review", active: false }
+                     ].map((rule, i) => (
                          <tr key={i} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                              <td className="px-6 py-4 font-medium text-zinc-900 dark:text-white">{rule.name}</td>
                              <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400 font-mono text-xs">{rule.condition}</td>
@@ -177,15 +170,12 @@ const ClassificationSettings = () => {
                                  </span>
                              </td>
                              <td className="px-6 py-4 text-right">
-                                 <button
-                                    onClick={() => toggleRule(i)}
-                                    className={clsx(
-                                        "inline-flex w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors",
-                                        rule.active ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
-                                    )}
-                                 >
+                                 <div className={clsx(
+                                     "inline-flex w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors",
+                                     rule.active ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
+                                 )}>
                                      <div className={clsx("w-3 h-3 bg-white rounded-full shadow-sm transition-transform", rule.active ? "translate-x-4" : "translate-x-0")} />
-                                 </button>
+                                 </div>
                              </td>
                          </tr>
                      ))}
@@ -198,17 +188,9 @@ const ClassificationSettings = () => {
              </div>
         </div>
     </>
-  );
-};
+);
 
-const SensitiveTopicsSettings = () => {
-  const [topics, setTopics] = useState(['Layoffs', 'Acquisition', 'Salary Review', 'Legal Dispute', 'Patent Filing', 'HR Investigation']);
-
-  const removeTopic = (topic: string) => {
-    setTopics(topics.filter(t => t !== topic));
-  };
-
-  return (
+const SensitiveTopicsSettings = () => (
     <>
          <div className="mb-8">
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Sensitive Topics</h1>
@@ -216,20 +198,17 @@ const SensitiveTopicsSettings = () => {
         </div>
 
         <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-xl p-4 mb-6 flex items-start gap-3">
-            <AlertCircle className="text-amber-600 dark:text-amber-400 shrink-0" size={20} />
+            <AlertCircle className="text-amber-600 dark:text-amber-400 flex-shrink-0" size={20} />
             <p className="text-sm text-amber-900 dark:text-amber-200">
                 When these topics are detected, "Capture Only" mode is automatically enforced and no external summaries will be drafted.
             </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {topics.map((topic) => (
+            {['Layoffs', 'Acquisition', 'Salary Review', 'Legal Dispute', 'Patent Filing', 'HR Investigation'].map((topic) => (
                 <div key={topic} className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-sm">
                     <span className="font-medium text-zinc-900 dark:text-white">{topic}</span>
-                    <button
-                        onClick={() => removeTopic(topic)}
-                        className="text-zinc-400 hover:text-red-500 transition-colors"
-                    >
+                    <button className="text-zinc-400 hover:text-red-500 transition-colors">
                         <Trash2 size={16} />
                     </button>
                 </div>
@@ -240,24 +219,17 @@ const SensitiveTopicsSettings = () => {
             </button>
         </div>
     </>
-  );
-};
+);
 
 // --- Shared Components ---
 
-const AutonomyCard = ({ title, description, active, onClick, icon: Icon }: {
-  title: string;
-  description: string;
-  active: boolean;
-  onClick: () => void;
-  icon: React.ElementType;
-}) => (
-    <div
+const AutonomyCard = ({ title, description, active, onClick, icon: Icon }: any) => (
+    <div 
         onClick={onClick}
         className={clsx(
             "p-5 rounded-xl border cursor-pointer transition-all relative overflow-hidden",
-            active
-                ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white ring-1 ring-zinc-900 dark:ring-white"
+            active 
+                ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white ring-1 ring-zinc-900 dark:ring-white" 
                 : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
         )}
     >
@@ -271,7 +243,7 @@ const AutonomyCard = ({ title, description, active, onClick, icon: Icon }: {
             <h3 className="font-semibold text-zinc-900 dark:text-white">{title}</h3>
         </div>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{description}</p>
-
+        
         {active && (
             <div className="absolute top-3 right-3 text-zinc-900 dark:text-white">
                 <Check size={16} />
@@ -287,12 +259,7 @@ const Section = ({ title, children }: { title: string, children: React.ReactNode
     </div>
 );
 
-const IntegrationRow = ({ name, status, description, isDisconnected }: {
-  name: string;
-  status: string;
-  description: string;
-  isDisconnected?: boolean;
-}) => (
+const IntegrationRow = ({ name, status, description, isDisconnected }: any) => (
     <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
             <div className={clsx("w-2 h-2 rounded-full", isDisconnected ? "bg-zinc-300 dark:bg-zinc-700" : "bg-emerald-500")} />
@@ -303,8 +270,8 @@ const IntegrationRow = ({ name, status, description, isDisconnected }: {
         </div>
         <button className={clsx(
             "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-            isDisconnected
-                ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent hover:opacity-90"
+            isDisconnected 
+                ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent hover:opacity-90" 
                 : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
         )}>
             {isDisconnected ? "Connect" : "Manage"}
