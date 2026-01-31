@@ -1,0 +1,135 @@
+/**
+ * Pager Lens design tokens, theme, and utilities
+ * Migrated from Pager Lens (Figma) for the webview.
+ */
+
+@import "tw-animate-css";
+
+/* -------------------------------------------------------------------------
+   :root – Pager Lens (Apple-like, light) design tokens
+   ------------------------------------------------------------------------- */
+:root {
+  --font-size: 16px;
+  --background: #ffffff;
+  --foreground: #1c1c1e;
+  --card: rgba(255, 255, 255, 0.9);
+  --card-foreground: #1c1c1e;
+  --popover: #ffffff;
+  --popover-foreground: #1c1c1e;
+  --primary: #007aff;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f7;
+  --secondary-foreground: #1c1c1e;
+  --muted: #f2f2f7;
+  --muted-foreground: #6e6e73;
+  --accent: #007aff;
+  --accent-foreground: #ffffff;
+  --destructive: #ff3b30;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.06);
+  --input: transparent;
+  --input-background: #f2f2f7;
+  --switch-background: #e5e5ea;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-normal: 400;
+  --ring: #007aff;
+  --chart-1: #ff3b30;
+  --chart-2: #ff9500;
+  --chart-3: #ffcc00;
+  --chart-4: #34c759;
+  --chart-5: #007aff;
+  --radius: 1rem;
+  --sidebar: #f2f2f7;
+  --sidebar-foreground: #1c1c1e;
+  --sidebar-primary: #007aff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e5e5ea;
+  --sidebar-accent-foreground: #1c1c1e;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-ring: #007aff;
+
+  --color-critical: #ff3b30;
+  --color-high: #ff9500;
+  --color-medium: #ffcc00;
+  --color-resolved: #34c759;
+  --color-info: #007aff;
+
+  --text-primary: #1c1c1e;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #8e8e93;
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.06);
+
+  --text-2xl: 1.5rem;
+  --text-xl: 1.25rem;
+  --text-lg: 1.125rem;
+  --text-base: 1rem;
+}
+
+/* -------------------------------------------------------------------------
+   @theme – map CSS vars to Tailwind (for bg-primary, text-foreground, etc.)
+   ------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* -------------------------------------------------------------------------
+   Pager Lens utilities (safe-area, animate-slide-up)
+   ------------------------------------------------------------------------- */
+@layer utilities {
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .animate-slide-up {
+    animation: pager-lens-slide-up 0.3s ease-out;
+  }
+}
+
+@keyframes pager-lens-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
