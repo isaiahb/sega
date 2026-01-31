@@ -1,0 +1,41 @@
+{
+  "name": "@mentra/sega",
+  "version": "0.1.0",
+  "description": "SEGA - Smart Executive Glasses Assistant",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaiahb/sega"
+  },
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null; NODE_ENV=development bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "ngrok": "ngrok http 3000 --url https://isaiah-tpa.ngrok.app"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.35.0",
+    "@google/genai": "^1.0.0",
+    "@mendable/firecrawl-js": "^1.15.0",
+    "@mentra/react": "2.1.2",
+    "@mentra/sdk": "3.0.0-hono.2",
+    "bun-plugin-tailwind": "^0.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "hono": "^4.11.3",
+    "lucide-react": "^0.545.0",
+    "mongoose": "^9.0.2",
+    "react": "^19",
+    "react-dom": "^19",
+    "resend": "^4.0.0",
+    "tailwind-merge": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.0.0"
+  }
+}
