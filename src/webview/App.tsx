@@ -1,47 +1,42 @@
 /**
- * SEGA - Smart Executive Glasses Assistant
+ * Executive Lens - Smart Executive Glasses Assistant
  *
  * Main webview interface with:
+ * - Multi-view dashboard (Today, Notes, Actions, Agents, Settings, Help)
+ * - Collapsible sidebar navigation
+ * - Real-time transcription via SSE
  * - Onboarding flow for user profile setup
- * - Chat interface for AI conversations
- * - Real-time transcription display
- * - Notes and research panel
  */
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useMentraAuth } from "@mentra/react";
+import { Toaster } from "sonner";
+import { clsx } from "clsx";
 import { useSSE } from "./hooks/useSSE";
+import { Sidebar } from "./components/layout/Sidebar";
+import { TopBar } from "./components/layout/TopBar";
+
+// Views
+import { TodayView } from "./views/TodayView";
+import { NotesView } from "./views/NotesView";
+import { ActionsView } from "./views/ActionsView";
+import { AgentsView } from "./views/AgentsView";
+import { SettingsView } from "./views/SettingsView";
+import { HelpView } from "./views/HelpView";
+
 import {
-  Wifi,
-  WifiOff,
-  User,
-  Send,
-  Trash2,
-  Bot,
-  Loader2,
-  Settings,
-  FileText,
-  Mic,
-  MicOff,
-  ChevronRight,
   Sparkles,
+  User,
   Search,
-  Mail,
-  StickyNote,
+  Mic,
+  Bot,
+  ChevronRight,
 } from "lucide-react";
 
 // =============================================================================
 // Types
 // =============================================================================
-
-interface Message {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  glassesDisplay?: string;
-  timestamp: Date;
-}
 
 interface UserProfile {
   name: string;
@@ -55,12 +50,20 @@ interface UserProfile {
   customInstructions?: string;
 }
 
+type ViewType = 'today' | 'notes' | 'actions' | 'agents' | 'settings' | 'help';
+
 // =============================================================================
 // App Component
 // =============================================================================
 
 export function App() {
   const { userId, isLoading, error, isAuthenticated } = useMentraAuth();
+  const { isConnected } = useSSE(userId || null);
+
+  // App state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeView, setActiveView] = useState<ViewType>('today');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   // Check if on onboarding page
   const isOnboarding = useMemo(
@@ -68,10 +71,35 @@ export function App() {
     [],
   );
 
+  // Toggle Theme Function
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // Keyboard Navigation for Views
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "1" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setActiveView('today');
+      }
+      if (e.key === "3" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setActiveView('notes');
+      }
+      if (e.key === "5" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setActiveView('actions');
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -80,11 +108,11 @@ export function App() {
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30"
+            className="w-16 h-16 rounded-2xl bg-zinc-900 dark:bg-white flex items-center justify-center shadow-lg"
           >
-            <Sparkles className="w-8 h-8 text-white" />
+            <span className="text-white dark:text-zinc-900 font-bold text-2xl">E</span>
           </motion.div>
-          <p className="text-slate-400">Loading SEGA...</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Loading Executive Lens...</p>
         </motion.div>
       </div>
     );
@@ -93,7 +121,7 @@ export function App() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -102,11 +130,11 @@ export function App() {
           <div className="w-16 h-16 rounded-2xl bg-red-500 mx-auto mb-4 flex items-center justify-center">
             <span className="text-white text-2xl">!</span>
           </div>
-          <h2 className="text-xl font-semibold text-red-400 mb-2">
+          <h2 className="text-xl font-semibold text-red-500 mb-2">
             Authentication Error
           </h2>
-          <p className="text-slate-400 text-sm">{error}</p>
-          <p className="text-slate-500 text-xs mt-2">
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">{error}</p>
+          <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-2">
             Open this page from the MentraOS app.
           </p>
         </motion.div>
@@ -114,39 +142,64 @@ export function App() {
     );
   }
 
-  // Not authenticated
-  if (!isAuthenticated || !userId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center p-8 max-w-md"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 mx-auto mb-4 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-xl font-semibold text-white mb-2">
-            Authentication Required
-          </h2>
-          <p className="text-slate-400 text-sm">
-            Open this webview from MentraOS to authenticate.
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Render onboarding or main chat
+  // Render onboarding or main app
   if (isOnboarding) {
-    return <OnboardingFlow userId={userId} />;
+    return <OnboardingFlow userId={userId || ""} />;
   }
 
-  return <SegaChat userId={userId} />;
+  // Navigation handler
+  const handleNavigate = (view: string) => setActiveView(view as ViewType);
+
+  // Render view based on activeView
+  const renderView = () => {
+    switch(activeView) {
+      case 'today': return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
+      case 'notes': return <NotesView />;
+      case 'actions': return <ActionsView />;
+      case 'agents': return <AgentsView />;
+      case 'settings': return <SettingsView isDarkMode={theme === 'dark'} onToggleTheme={toggleTheme} />;
+      case 'help': return <HelpView />;
+      default: return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
+    }
+  };
+
+  const getBreadcrumb = () => {
+    return activeView.charAt(0).toUpperCase() + activeView.slice(1);
+  };
+
+  return (
+    <div className={clsx("flex h-screen w-full font-sans bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 selection:bg-zinc-200 dark:selection:bg-zinc-800", theme)}>
+      <Toaster position="top-center" theme={theme} />
+
+      {/* Sidebar */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        activeItem={activeView}
+        onNavigate={(item) => setActiveView(item as ViewType)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-black relative transition-all duration-300">
+
+        <TopBar
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          title={getBreadcrumb()}
+          onNavigate={(view) => setActiveView(view as ViewType)}
+          isConnected={isConnected}
+        />
+
+        <main className="flex-1 overflow-hidden relative">
+          {renderView()}
+        </main>
+
+      </div>
+    </div>
+  );
 }
 
 // =============================================================================
-// Onboarding Flow
+// Onboarding Flow (Preserved and restyled)
 // =============================================================================
 
 function OnboardingFlow({ userId }: { userId: string }) {
@@ -185,7 +238,7 @@ function OnboardingFlow({ userId }: { userId: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black flex flex-col">
       {/* Progress */}
       <div className="p-4">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
@@ -194,8 +247,8 @@ function OnboardingFlow({ userId }: { userId: string }) {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
                   i <= step
-                    ? "bg-indigo-500 text-white"
-                    : "bg-slate-700 text-slate-400"
+                    ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
+                    : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
                 }`}
               >
                 {i + 1}
@@ -203,7 +256,7 @@ function OnboardingFlow({ userId }: { userId: string }) {
               {i < steps.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 transition-colors ${
-                    i < step ? "bg-indigo-500" : "bg-slate-700"
+                    i < step ? "bg-zinc-900 dark:bg-white" : "bg-zinc-200 dark:bg-zinc-800"
                   }`}
                 />
               )}
@@ -223,19 +276,19 @@ function OnboardingFlow({ userId }: { userId: string }) {
         >
           {step === 0 && (
             <div className="text-center">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 mx-auto mb-6 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <Sparkles className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 rounded-3xl bg-zinc-900 dark:bg-white mx-auto mb-6 flex items-center justify-center shadow-lg">
+                <span className="text-white dark:text-zinc-900 font-bold text-3xl">E</span>
               </div>
-              <h1 className="text-3xl font-bold text-white mb-4">
-                Welcome to SEGA
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-4">
+                Welcome to Executive Lens
               </h1>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
+              <p className="text-zinc-500 dark:text-zinc-400 mb-8 max-w-md mx-auto">
                 Your Smart Executive Glasses Assistant. Tell me about yourself
                 and I'll adapt to help with meetings, research, notes, and more.
               </p>
               <button
                 onClick={() => setStep(1)}
-                className="px-8 py-3 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors inline-flex items-center gap-2"
+                className="px-8 py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium hover:opacity-90 transition-colors inline-flex items-center gap-2"
               >
                 Get Started <ChevronRight className="w-4 h-4" />
               </button>
@@ -243,13 +296,13 @@ function OnboardingFlow({ userId }: { userId: string }) {
           )}
 
           {step === 1 && (
-            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-              <h2 className="text-xl font-semibold text-white mb-6">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-6">
                 Tell me about yourself
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                     Your Name
                   </label>
                   <input
@@ -259,11 +312,11 @@ function OnboardingFlow({ userId }: { userId: string }) {
                       setProfile({ ...profile, name: e.target.value })
                     }
                     placeholder="John Smith"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-700 text-white border border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-600 focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                     Your Role
                   </label>
                   <input
@@ -273,11 +326,11 @@ function OnboardingFlow({ userId }: { userId: string }) {
                       setProfile({ ...profile, role: e.target.value })
                     }
                     placeholder="e.g., Sales Rep, Investor, Engineer, Doctor, Journalist..."
-                    className="w-full px-4 py-3 rounded-xl bg-slate-700 text-white border border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-600 focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                     Company / Organization (optional)
                   </label>
                   <input
@@ -287,11 +340,11 @@ function OnboardingFlow({ userId }: { userId: string }) {
                       setProfile({ ...profile, company: e.target.value })
                     }
                     placeholder="Where you work"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-700 text-white border border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-600 focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                     Email (for reports, optional)
                   </label>
                   <input
@@ -301,14 +354,14 @@ function OnboardingFlow({ userId }: { userId: string }) {
                       setProfile({ ...profile, email: e.target.value })
                     }
                     placeholder="john@example.com"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-700 text-white border border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-600 focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700 outline-none transition-all"
                   />
                 </div>
               </div>
               <div className="flex justify-end mt-6">
                 <button
                   onClick={() => setStep(2)}
-                  className="px-6 py-2 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors inline-flex items-center gap-2"
+                  className="px-6 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium hover:opacity-90 transition-colors inline-flex items-center gap-2"
                 >
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
@@ -317,11 +370,11 @@ function OnboardingFlow({ userId }: { userId: string }) {
           )}
 
           {step === 2 && (
-            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-              <h2 className="text-xl font-semibold text-white mb-2">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
                 What are you interested in?
               </h2>
-              <p className="text-slate-400 text-sm mb-6">
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">
                 Select topics you care about. I'll tailor research and notes to
                 these areas.
               </p>
@@ -355,8 +408,8 @@ function OnboardingFlow({ userId }: { userId: string }) {
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                       profile.interests?.includes(interest)
-                        ? "bg-indigo-500 text-white"
-                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                        ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                     }`}
                   >
                     {interest}
@@ -366,13 +419,13 @@ function OnboardingFlow({ userId }: { userId: string }) {
               <div className="flex justify-between mt-6">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-6 py-2 rounded-xl text-slate-400 hover:text-white transition-colors"
+                  className="px-6 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   Back
                 </button>
                 <button
                   onClick={() => setStep(3)}
-                  className="px-6 py-2 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors inline-flex items-center gap-2"
+                  className="px-6 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium hover:opacity-90 transition-colors inline-flex items-center gap-2"
                 >
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
@@ -381,11 +434,11 @@ function OnboardingFlow({ userId }: { userId: string }) {
           )}
 
           {step === 3 && (
-            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-              <h2 className="text-xl font-semibold text-white mb-2">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
                 What should I listen for?
               </h2>
-              <p className="text-slate-400 text-sm mb-6">
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">
                 During meetings and conversations, I'll pay special attention to
                 these.
               </p>
@@ -417,8 +470,8 @@ function OnboardingFlow({ userId }: { userId: string }) {
                     }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                       profile.listenFor?.includes(item)
-                        ? "bg-indigo-500 text-white"
-                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                        ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                     }`}
                   >
                     {item}
@@ -428,13 +481,13 @@ function OnboardingFlow({ userId }: { userId: string }) {
               <div className="flex justify-between mt-6">
                 <button
                   onClick={() => setStep(2)}
-                  className="px-6 py-2 rounded-xl text-slate-400 hover:text-white transition-colors"
+                  className="px-6 py-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   Back
                 </button>
                 <button
                   onClick={() => setStep(4)}
-                  className="px-6 py-2 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors inline-flex items-center gap-2"
+                  className="px-6 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium hover:opacity-90 transition-colors inline-flex items-center gap-2"
                 >
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
@@ -444,26 +497,26 @@ function OnboardingFlow({ userId }: { userId: string }) {
 
           {step === 4 && (
             <div className="text-center">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 mx-auto mb-6 flex items-center justify-center shadow-lg shadow-green-500/30">
+              <div className="w-20 h-20 rounded-3xl bg-emerald-500 mx-auto mb-6 flex items-center justify-center shadow-lg">
                 <Bot className="w-10 h-10 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-white mb-4">
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-4">
                 You're all set!
               </h1>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                SEGA is ready to assist you. Put on your glasses and start
+              <p className="text-zinc-500 dark:text-zinc-400 mb-8 max-w-md mx-auto">
+                Executive Lens is ready to assist you. Put on your glasses and start
                 speaking - I'll adapt to your needs and help however I can.
               </p>
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
                 <button
                   onClick={handleComplete}
-                  className="px-8 py-3 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition-colors inline-flex items-center justify-center gap-2"
+                  className="px-8 py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium hover:opacity-90 transition-colors inline-flex items-center justify-center gap-2"
                 >
-                  Open SEGA <ChevronRight className="w-4 h-4" />
+                  Open Executive Lens <ChevronRight className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setStep(1)}
-                  className="px-8 py-3 rounded-xl text-slate-400 hover:text-white transition-colors"
+                  className="px-8 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   Edit Profile
                 </button>
@@ -472,361 +525,6 @@ function OnboardingFlow({ userId }: { userId: string }) {
           )}
         </motion.div>
       </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// Main Chat Interface
-// =============================================================================
-
-function SegaChat({ userId }: { userId: string }) {
-  const { isConnected, lastEvent } = useSSE(userId);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [agentStatus, setAgentStatus] = useState<string | null>(null);
-  const [transcription, setTranscription] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Handle SSE events
-  useEffect(() => {
-    if (!lastEvent) return;
-
-    switch (lastEvent.type) {
-      case "transcription":
-        if (lastEvent.isFinal) {
-          // Add user message when transcription is final
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `user-voice-${Date.now()}`,
-              role: "user",
-              content: lastEvent.text,
-              timestamp: new Date(),
-            },
-          ]);
-          setTranscription(null);
-          setIsProcessing(true);
-        } else {
-          setTranscription(lastEvent.text);
-        }
-        break;
-
-      case "agent_progress":
-        setAgentStatus(lastEvent.message || "Processing...");
-        break;
-
-      case "agent_complete":
-        setAgentStatus(null);
-        setIsProcessing(false);
-        setTranscription(null);
-        if (lastEvent.response) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `assistant-${Date.now()}`,
-              role: "assistant",
-              content: lastEvent.response.webviewContent,
-              glassesDisplay: lastEvent.response.glassesDisplay,
-              timestamp: new Date(),
-            },
-          ]);
-        }
-        break;
-
-      case "agent_error":
-        setAgentStatus(null);
-        setIsProcessing(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            content: `Error: ${lastEvent.error}`,
-            timestamp: new Date(),
-          },
-        ]);
-        break;
-    }
-  }, [lastEvent]);
-
-  // Send message
-  const handleSend = async () => {
-    if (!input.trim() || isProcessing) return;
-
-    const userMessage = input.trim();
-    setInput("");
-    setIsProcessing(true);
-
-    // Add user message
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: userMessage,
-        timestamp: new Date(),
-      },
-    ]);
-
-    try {
-      const response = await fetch("/api/agent/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ query: userMessage }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-    } catch (error) {
-      setIsProcessing(false);
-      setAgentStatus(null);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  };
-
-  // Clear history
-  const handleClear = async () => {
-    try {
-      await fetch("/api/agent/clear", {
-        method: "POST",
-        credentials: "include",
-      });
-      setMessages([]);
-    } catch (error) {
-      console.error("Failed to clear history:", error);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col">
-      {/* Header */}
-      <header className="bg-slate-800/50 backdrop-blur border-b border-slate-700 px-4 py-3 flex-shrink-0">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-white">SEGA</h1>
-              <p className="text-xs text-slate-400">
-                Smart Executive Glasses Assistant
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Connection Status */}
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs ${
-                isConnected
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-slate-700 text-slate-400"
-              }`}
-            >
-              {isConnected ? (
-                <>
-                  <Wifi className="w-3 h-3" />
-                  <span>Connected</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3 h-3" />
-                  <span>Disconnected</span>
-                </>
-              )}
-            </div>
-            {/* Clear Button */}
-            <button
-              onClick={handleClear}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              title="Clear chat"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-            {/* Settings */}
-            <button
-              onClick={() => (window.location.href = "/onboarding")}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Live Transcription Banner */}
-      <AnimatePresence>
-        {transcription && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-indigo-500/10 border-b border-indigo-500/20 px-4 py-2"
-          >
-            <div className="max-w-4xl mx-auto flex items-center gap-2">
-              <Mic className="w-4 h-4 text-indigo-400 animate-pulse" />
-              <span className="text-indigo-300 text-sm">{transcription}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Messages */}
-      <main className="flex-1 overflow-auto p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {messages.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-16"
-            >
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 mx-auto mb-6 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <Bot className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-2xl font-semibold text-white mb-3">
-                Ready to assist
-              </h2>
-              <p className="text-slate-400 max-w-md mx-auto mb-8">
-                Speak through your glasses or type below. I can help with
-                research, note-taking, and sending email summaries.
-              </p>
-
-              {/* Quick Actions */}
-              <div className="flex flex-wrap justify-center gap-3">
-                <button
-                  onClick={() => setInput("Research ")}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <Search className="w-4 h-4" /> Research
-                </button>
-                <button
-                  onClick={() => setInput("Take a note: ")}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <StickyNote className="w-4 h-4" /> Take Note
-                </button>
-                <button
-                  onClick={() => setInput("Email me a summary of ")}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <Mail className="w-4 h-4" /> Email Summary
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <AnimatePresence>
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                      message.role === "user"
-                        ? "bg-indigo-500 text-white"
-                        : "bg-slate-800 border border-slate-700"
-                    }`}
-                  >
-                    {message.role === "assistant" && (
-                      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700">
-                        <Bot className="w-4 h-4 text-indigo-400" />
-                        <span className="text-xs text-slate-400">SEGA</span>
-                      </div>
-                    )}
-                    <div
-                      className={`text-sm whitespace-pre-wrap ${
-                        message.role === "user"
-                          ? "text-white"
-                          : "text-slate-200"
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                    {message.glassesDisplay && (
-                      <div className="mt-3 pt-2 border-t border-slate-700">
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <span>👓</span> {message.glassesDisplay}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          )}
-
-          {/* Agent Status */}
-          {(agentStatus || isProcessing) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-3 text-sm text-slate-400 bg-slate-800/50 rounded-xl px-4 py-3"
-            >
-              <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-              <span>{agentStatus || "Processing..."}</span>
-            </motion.div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
-
-      {/* Input */}
-      <footer className="bg-slate-800/50 backdrop-blur border-t border-slate-700 p-4 flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-3"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything..."
-              className="flex-1 px-4 py-3 rounded-xl bg-slate-700 text-white border border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-400"
-              disabled={isProcessing}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || isProcessing}
-              className="px-4 py-3 rounded-xl bg-indigo-500 text-white font-medium hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isProcessing ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
-          </form>
-          <p className="text-xs text-slate-500 mt-2 text-center">
-            Speak through your glasses or type here • Research • Notes • Email
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
