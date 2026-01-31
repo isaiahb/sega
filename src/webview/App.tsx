@@ -63,7 +63,7 @@ export function App() {
   // App state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>('today');
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // Check if on onboarding page
   const isOnboarding = useMemo(

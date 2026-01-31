@@ -382,7 +382,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
     if (isRecording) {
       interval = setInterval(() => {
         setDuration(prev => prev + 1);
-      }, 100);
+      }, 1000); // Changed from 100ms to 1000ms for proper second incrementing
     } else {
       setDuration(0);
       setResearchItems([]);
@@ -454,12 +454,12 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                layout
                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                className={clsx(
-                   "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 flex flex-col justify-between shadow-sm relative overflow-hidden group",
+                   "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col shadow-sm relative overflow-hidden group",
                    isRecording ? "lg:col-span-1" : "lg:col-span-2"
                )}
            >
                 {/* Header */}
-                <div className="flex items-start justify-between z-10">
+                <div className="flex items-start justify-between z-10 mb-2 shrink-0">
                     <div className="flex items-center gap-3">
                         <motion.div
                             layout
@@ -478,7 +478,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                 </div>
 
                 {/* Center - Timer Display */}
-                <div className="flex-1 flex flex-col items-center justify-center py-6 z-10">
+                <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-3 z-10 relative">
                     <AnimatePresence mode="wait">
                     {isRecording ? (
                         <motion.div
@@ -488,15 +488,15 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             exit={{ opacity: 0, scale: 0.9 }}
                             className="flex flex-col items-center"
                         >
-                             <div className="relative">
+                             <div className="relative inline-block">
                                  <span className="font-mono text-4xl font-bold text-zinc-900 dark:text-white tracking-tighter tabular-nums">
                                     {formatDuration(duration)}
                                  </span>
-                                 <div className="absolute -right-3 -top-1">
-                                     <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                                 <div className="absolute -right-2 -top-2">
+                                     <span className="flex h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>
                                  </div>
                              </div>
-                             <span className="text-[10px] text-red-500 font-bold mt-2 uppercase tracking-[0.2em] border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded-full">Recording</span>
+                             <span className="text-[10px] text-red-500 font-bold  uppercase tracking-[0.2em] border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded-full">Recording</span>
                         </motion.div>
                     ) : (
                         <motion.div
@@ -504,7 +504,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.6 }}
                             exit={{ opacity: 0 }}
-                            className="flex flex-col items-center justify-center gap-3"
+                            className="flex flex-col items-center justify-center gap-3 -mt-[15px]"
                         >
                             <div className="flex gap-1">
                                 {[1,2,3,4].map(i => (
@@ -516,27 +516,29 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                                     />
                                 ))}
                             </div>
-                            <span className="text-xs font-medium text-zinc-400">Waiting for input...</span>
                         </motion.div>
                     )}
                     </AnimatePresence>
+                    {!isRecording && (
+                        <span className="absolute bottom-0 text-xs font-medium text-zinc-400 shrink-0">Waiting for input...</span>
+                    )}
                 </div>
 
                 {/* Footer - Controls */}
-                <div className="z-10">
+                <div className="z-10 mt-2 min-w-0 shrink-0">
                      <button
                         onClick={() => setIsRecording(!isRecording)}
                         className={clsx(
-                            "absolute bottom-6 left-6 right-6 z-20 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm border",
+                            "w-full py-3 px-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm border min-w-0",
                             isRecording
                                 ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400"
                                 : "bg-zinc-900 border-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900"
                         )}
                      >
                         {isRecording ? (
-                            <><Square size={16} fill="currentColor"/> End Session</>
+                            <><Square size={16} fill="currentColor" className="shrink-0"/> <span className="truncate">End Session</span></>
                         ) : (
-                            <><Play size={16} fill="currentColor"/> Start Recording</>
+                            <><Play size={16} fill="currentColor" className="shrink-0"/> <span className="truncate">Start Recording</span></>
                         )}
                      </button>
                 </div>
@@ -597,14 +599,14 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
 
             {/* 2. Deep Intelligence (Right 2/3) */}
             <div className="md:col-span-2 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col shadow-sm h-full overflow-hidden">
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                    <div className="flex items-center gap-2">
-                        <Sparkles size={16} className="text-purple-500" />
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Deep Intelligence</h3>
+                <div className="flex items-center justify-between mb-4 shrink-0 min-w-0 gap-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Sparkles size={16} className="text-purple-500 shrink-0" />
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider truncate">Deep Intelligence</h3>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         {/* View Toggle */}
-                        <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg mr-2 border border-zinc-200 dark:border-zinc-700">
+                        <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                             <button
                                 onClick={() => setViewMode('grid')}
                                 className={clsx(
@@ -625,7 +627,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             </button>
                         </div>
 
-                        <span className="hidden sm:inline-block text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-md font-medium border border-purple-100 dark:border-purple-800">
+                        <span className="hidden sm:inline-block text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-md font-medium border border-purple-100 dark:border-purple-800 whitespace-nowrap">
                             AUTO-RESEARCH ACTIVE
                         </span>
                     </div>
