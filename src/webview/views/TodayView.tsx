@@ -22,7 +22,7 @@ import glassesG1 from '../assets/glasses-g1.png';
 import glassesHUD from '../assets/glasses-hud.png';
 
 // Even Realities logo SVG path
-const evenRealitiesSvgPath = "M9.52 0C4.26 0 0 4.26 0 9.52c0 3.82 2.25 7.11 5.5 8.63v-2.41a6.89 6.89 0 01-3.17-5.82c0-3.82 3.1-6.92 6.92-6.92 3.26 0 5.99 2.26 6.72 5.3h2.36C17.56 3.52 13.9 0 9.52 0zm0 16.79c-4.02 0-7.27-3.26-7.27-7.27S5.5 2.25 9.52 2.25s7.27 3.26 7.27 7.27-3.26 7.27-7.27 7.27z";
+const evenRealitiesSvgPath = "M7.18536 0.0734575C7.3836 0.171586 7.29624 0.196119 6.81366 0.176843L6.18324 0.151873L6.20592 1.73245L6.22818 3.31302H4.80186H3.37554L3.339 1.74384L3.30246 0.174653L1.68462 0.175091H0.0667802L0.0331802 8.41572L0 16.6559L0.40194 16.7483C0.62286 16.7987 1.38054 16.7974 2.0853 16.7444L3.36714 16.6489V15.1108V13.5732H4.78674H6.20634L6.24288 15.1594L6.27942 16.7457H12.6214H18.9634L19.0012 15.0788C19.0252 14.0389 18.9874 13.3471 18.9013 13.2389C18.7921 13.1018 17.4926 13.069 12.679 13.083L6.59484 13.1005L6.63138 11.714L6.6675 10.3275L11.8448 10.3038C14.6924 10.2907 17.4762 10.2565 18.031 10.228L19.0403 10.1763L19.0021 8.46566L18.9634 6.75542L18.3809 6.6678C18.0608 6.61917 15.2796 6.58895 12.2006 6.60034L6.60282 6.62049V5.23661V3.85317L12.6538 3.85098C15.9818 3.84966 18.779 3.79929 18.8706 3.73927C18.9945 3.65691 19.0268 3.19343 19 1.90417L18.9634 0.179034L17.1515 0.135226C10.7058 -0.0198526 6.951 -0.0430705 7.18536 0.0734575ZM6.21474 8.44288V9.79303H4.79094H3.36714V8.44288V7.09317H4.79094H6.21474V8.44288Z";
 
 // --- Types ---
 interface Note {
@@ -124,9 +124,9 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                  <div
                     className="absolute text-left overflow-hidden flex items-center"
                     style={{
-                        left: '39.5%',
-                        top: '30.8%',
-                        width: '42.3%',
+                        left: '43.5%',
+                        top: '15.8%',
+                        width: '30.3%',
                         bottom: '25%'
                     }}
                  >
@@ -134,7 +134,7 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         key={hudText}
-                        className="font-mono text-[#00b869] text-[6px] lg:text-[8px] leading-relaxed whitespace-pre-wrap break-words"
+                        className="font-mono text-[#00b869] text-[9px] lg:text-[14px] leading-relaxed whitespace-pre-wrap break-words"
                      >
                          {hudText}
                          <motion.span
@@ -153,8 +153,15 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                 className="flex-1 min-w-0 space-y-3"
               >
                   {/* Header */}
-                  <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700/50 pb-2">
-                      <h3 className="text-xs font-bold text-zinc-900 dark:text-white">G1 STATUS</h3>
+                  <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700/50 pb-[1px]">
+                      <div className="flex items-center gap-2">
+                          <div className="h-5 w-6 relative text-zinc-900 dark:text-white">
+                              <svg className="block size-full" viewBox="0 0 20 17" fill="currentColor">
+                                  <path fillRule="evenodd" clipRule="evenodd" d="M7.18536 0.0734575C7.3836 0.171586 7.29624 0.196119 6.81366 0.176843L6.18324 0.151873L6.20592 1.73245L6.22818 3.31302H4.80186H3.37554L3.339 1.74384L3.30246 0.174653L1.68462 0.175091H0.0667802L0.0331802 8.41572L0 16.6559L0.40194 16.7483C0.62286 16.7987 1.38054 16.7974 2.0853 16.7444L3.36714 16.6489V15.1108V13.5732H4.78674H6.20634L6.24288 15.1594L6.27942 16.7457H12.6214H18.9634L19.0012 15.0788C19.0252 14.0389 18.9874 13.3471 18.9013 13.2389C18.7921 13.1018 17.4926 13.069 12.679 13.083L6.59484 13.1005L6.63138 11.714L6.6675 10.3275L11.8448 10.3038C14.6924 10.2907 17.4762 10.2565 18.031 10.228L19.0403 10.1763L19.0021 8.46566L18.9634 6.75542L18.3809 6.6678C18.0608 6.61917 15.2796 6.58895 12.2006 6.60034L6.60282 6.62049V5.23661V3.85317L12.6538 3.85098C15.9818 3.84966 18.779 3.79929 18.8706 3.73927C18.9945 3.65691 19.0268 3.19343 19 1.90417L18.9634 0.179034L17.1515 0.135226C10.7058 -0.0198526 6.951 -0.0430705 7.18536 0.0734575ZM6.21474 8.44288V9.79303H4.79094H3.36714V8.44288V7.09317H4.79094H6.21474V8.44288Z" />
+                              </svg>
+                          </div>
+                          <h3 className="text-[20px] font-bold text-zinc-900 dark:text-white">G1 STATUS</h3>
+                      </div>
                       <div className="flex items-center gap-1.5">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">LIVE</span>
@@ -166,21 +173,21 @@ const DeviceCard = ({ isRecording, hudText }: { isRecording: boolean; hudText: s
                       <div className="bg-white dark:bg-black/20 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800/50">
                           <div className="flex items-center gap-1.5 mb-0.5 text-emerald-500">
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/></svg>
-                              <span className="text-[10px] font-bold">84%</span>
+                              <span className="text-base font-bold">84%</span>
                           </div>
-                          <span className="text-[9px] text-zinc-500 dark:text-zinc-500">~4h Left</span>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-500">~4h Left</span>
                       </div>
                       <div className="bg-white dark:bg-black/20 p-2 rounded-lg border border-zinc-200 dark:border-zinc-800/50">
                           <div className="flex items-center gap-1.5 mb-0.5 text-blue-500">
                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-                              <span className="text-[10px] font-bold">5G</span>
+                              <span className="text-base font-bold">5G</span>
                           </div>
-                          <span className="text-[9px] text-zinc-500 dark:text-zinc-500">Strong</span>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-500">Strong</span>
                       </div>
                   </div>
 
                   {/* System Specs */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-0.5">
                       <div className="bg-zinc-100 dark:bg-zinc-800/50 rounded-lg p-2 flex items-center justify-between">
                           <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Uplink</span>
                           <span className="text-[10px] font-mono text-zinc-700 dark:text-zinc-300">12ms</span>
@@ -210,18 +217,13 @@ const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem
             className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 border border-zinc-100 dark:border-zinc-800"
         >
             <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                    <div className={clsx(
-                        "p-2 rounded-lg",
-                        type === 'person' ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" :
-                        type === 'company' ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600" :
-                        "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
-                    )}>
+                <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 mt-0.5 shrink-0">
                         {type === 'person' ? <UserCheck size={16} /> : type === 'company' ? <Building2 size={16} /> : <TrendingUp size={16} />}
                     </div>
                     <div>
-                        <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{title}</h4>
-                        <p className="text-xs text-zinc-500">{subtitle}</p>
+                        <h4 className="text-lg font-semibold text-zinc-900 dark:text-white">{title}</h4>
+                        <p className="text-base text-zinc-500">{subtitle}</p>
                     </div>
                 </div>
                 <div className={clsx(
@@ -563,9 +565,9 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
             {/* 1. Live Summary (Left 1/3) */}
             <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col shadow-sm h-full overflow-hidden">
                 <div className="flex items-center justify-between mb-4 shrink-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mt-[8px]">
                         <MessageSquareText size={16} className="text-zinc-500" />
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Live Transcript</h3>
+                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider truncate">Live Transcript</h3>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
@@ -577,8 +579,8 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             animate={{ opacity: 1, x: 0 }}
                             className="flex gap-3"
                         >
-                           <span className="text-xs font-mono text-zinc-400 shrink-0 mt-0.5">{note.time}</span>
-                           <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                           <span className="text-sm font-mono text-zinc-400 shrink-0 mt-0.5">{note.time}</span>
+                           <p className="text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
                                {note.text}
                            </p>
                         </motion.div>
@@ -588,7 +590,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex items-center gap-2 px-0 py-2 text-xs text-zinc-400 pl-11"
+                            className="flex items-center gap-2 px-0 py-2 text-sm text-zinc-400 pl-11"
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
                             Transcribing...
@@ -601,8 +603,8 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
             <div className="md:col-span-2 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col shadow-sm h-full overflow-hidden">
                 <div className="flex items-center justify-between mb-4 shrink-0 min-w-0 gap-4">
                     <div className="flex items-center gap-2 min-w-0">
-                        <Sparkles size={16} className="text-purple-500 shrink-0" />
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider truncate">Deep Intelligence</h3>
+                        <Sparkles size={16} className="text-zinc-600 dark:text-zinc-400 shrink-0" />
+                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider truncate">Deep Intelligence</h3>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         {/* View Toggle */}
@@ -627,7 +629,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                             </button>
                         </div>
 
-                        <span className="hidden sm:inline-block text-[10px] bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-md font-medium border border-purple-100 dark:border-purple-800 whitespace-nowrap">
+                        <span className="hidden sm:inline-block text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-1 rounded-md font-medium border border-zinc-200 dark:border-zinc-700 whitespace-nowrap">
                             AUTO-RESEARCH ACTIVE
                         </span>
                     </div>
