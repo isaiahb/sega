@@ -3,13 +3,14 @@
  *
  * An AI-powered executive assistant for smart glasses that:
  * - Listens to meetings and conversations
+ * - Detects and classifies meetings automatically
  * - Takes smart, contextual notes
  * - Performs deep research using Firecrawl
  * - Sends summaries and reports via Resend
  */
 
-import { SegaApp } from "./backend";
-import { api } from "./backend/api/router";
+import { SegaApp } from "./app";
+import { api } from "./api/router";
 import { createMentraAuthRoutes } from "@mentra/sdk";
 import indexDev from "./webview/index.html";
 import indexProd from "./webview/index.prod.html";
@@ -34,7 +35,10 @@ if (!API_KEY) {
 // Check optional integrations
 const hasFirecrawl = !!process.env.FIRECRAWL_API_KEY;
 const hasResend = !!process.env.RESEND_API_KEY;
-const hasAI = !!process.env.GEMINI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+const hasGemini = !!process.env.GEMINI_API_KEY;
+const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+const hasAI = hasGemini || hasAnthropic;
+const hasMongoDB = !!process.env.MONGODB_URI;
 
 console.log("🚀 Starting SEGA - Smart Executive Glasses Assistant\n");
 console.log(`   Package: ${PACKAGE_NAME}`);
@@ -42,7 +46,10 @@ console.log(`   Port: ${PORT}`);
 console.log("");
 console.log("   Integrations:");
 console.log(
-  `   • AI Provider: ${hasAI ? "✅" : "❌ (Set GEMINI_API_KEY or ANTHROPIC_API_KEY)"}`,
+  `   • AI Provider: ${hasAI ? (hasGemini ? "✅ Gemini" : "✅ Anthropic") : "❌ (Set GEMINI_API_KEY or ANTHROPIC_API_KEY)"}`,
+);
+console.log(
+  `   • MongoDB:     ${hasMongoDB ? "✅" : "⚠️  (Optional - Set MONGODB_URI for persistence)"}`,
 );
 console.log(
   `   • Firecrawl:   ${hasFirecrawl ? "✅" : "⚠️  (Optional - Set FIRECRAWL_API_KEY for web research)"}`,
