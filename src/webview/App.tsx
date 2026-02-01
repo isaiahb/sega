@@ -24,6 +24,7 @@ import { ActionsView } from "./views/ActionsView";
 import { AgentsView } from "./views/AgentsView";
 import { SettingsView } from "./views/SettingsView";
 import { HelpView } from "./views/HelpView";
+import { LandingView } from "./views/LandingView";
 
 import {
   Sparkles,
@@ -64,11 +65,23 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>('today');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [currentRoute, setCurrentRoute] = useState<'/' | '/app' | '/onboarding'>(
+    window.location.pathname === '/onboarding'
+      ? '/onboarding'
+      : window.location.pathname === '/app'
+      ? '/app'
+      : '/'
+  );
 
-  // Check if on onboarding page
+  // Check if on onboarding page or landing page
   const isOnboarding = useMemo(
-    () => window.location.pathname === "/onboarding",
-    [],
+    () => currentRoute === "/onboarding",
+    [currentRoute],
+  );
+
+  const isLanding = useMemo(
+    () => currentRoute === "/",
+    [currentRoute],
   );
 
   // Toggle Theme Function
@@ -94,6 +107,23 @@ export function App() {
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/onboarding') {
+        setCurrentRoute('/onboarding');
+      } else if (path === '/app') {
+        setCurrentRoute('/app');
+      } else {
+        setCurrentRoute('/');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Loading state
@@ -142,9 +172,23 @@ export function App() {
     );
   }
 
-  // Render onboarding or main app
+  // Route navigation handler
+  const handleRouteNavigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setCurrentRoute(path as '/' | '/app' | '/onboarding');
+    if (path === '/app') {
+      setActiveView('today');
+    }
+  };
+
+  // Render onboarding flow
   if (isOnboarding) {
     return <OnboardingFlow userId={userId || ""} />;
+  }
+
+  // Render landing page
+  if (isLanding) {
+    return <LandingView onNavigate={handleRouteNavigate} />;
   }
 
   // Navigation handler
