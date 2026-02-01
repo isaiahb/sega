@@ -18,6 +18,7 @@ import { MeetingManager } from "./MeetingManager";
 import { AgentManager } from "./AgentManager";
 import { NotesManager } from "./NotesManager";
 import { ResearchManager } from "./ResearchManager";
+import { EmailManager } from "./EmailManager";
 
 /**
  * Logger interface for session logging
@@ -134,6 +135,9 @@ export class UserSession {
   /** Deep web research using Firecrawl */
   readonly research: ResearchManager;
 
+  /** Email sending via Resend */
+  readonly email: EmailManager;
+
   /** Whether the session has been initialized */
   private initialized: boolean = false;
 
@@ -202,6 +206,14 @@ export class UserSession {
       meeting: this.meeting,
       broadcast: this.broadcast,
       display: this.display,
+    });
+
+    // EmailManager needs userId, logger, settings, broadcast
+    this.email = new EmailManager({
+      userId: this.userId,
+      logger: this.logger,
+      settings: this.settings,
+      broadcast: this.broadcast,
     });
 
     // AgentManager needs userId, logger, transcript, meeting, settings, broadcast, display, notes, research
@@ -304,6 +316,7 @@ export class UserSession {
     try {
       // Dispose managers in reverse order of dependency
       this.agent.dispose();
+      this.email.dispose();
       this.research.dispose();
       this.notes.dispose();
       this.meeting.dispose();

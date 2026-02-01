@@ -594,11 +594,103 @@ api.post("/notes/:id/generate-summary", async (c: Context) => {
  * POST /api/notes/:id/email - Email note
  */
 api.post("/notes/:id/email", async (c: Context) => {
-  const userId = requireAuth(c);
-  if (userId instanceof Response) return userId;
+  const result = requireSession(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
 
-  // TODO: Implement email via Resend
-  return c.json({ success: true, message: "Email queued" });
+  const noteId = c.req.param("id");
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const recipient = body.recipient || session.email.getDefaultRecipient();
+
+    if (!recipient) {
+      return c.json({ error: "No recipient email configured" }, 400);
+    }
+
+    if (!session.email.isAvailable()) {
+      return c.json({ error: "Email service not available" }, 503);
+    }
+
+    // Get note from database
+    if (isDBConnected()) {
+      const note = await NoteModel.findOne({ _id: noteId, userId });
+      if (!note) {
+        return c.json({ error: "Note not found" }, 404);
+      }
+
+      // Get meeting if linked
+      let meeting = null;
+      if (note.meetingId) {
+        const { Meeting: MeetingModel } = await import("../services/db");
+        meeting = await MeetingModel.findOne({ _id: note.meetingId, userId });
+      }
+
+      // Get action items for the note
+      const actionItems = await ActionItemModel.find({ noteId, userId });
+
+      // Send email
+      const emailResult = await session.email.sendMeetingSummary(
+        meeting ||
+          ({
+            _id: note.meetingId || "unknown",
+            userId,
+            title: note.title,
+            category: "unknown",
+            startTime: note.createdAt,
+            endTime: note.createdAt,
+            status: "complete",
+            transcriptDate: "",
+            transcriptStartIndex: 0,
+            attendees: [],
+            topics: [],
+            isSensitive: false,
+            actionItemIds: [],
+            researchIds: [],
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          } as any),
+        {
+          _id: note._id?.toString(),
+          userId: note.userId,
+          title: note.title,
+          summary: note.summary,
+          keyPoints: note.keyPoints,
+          decisions: note.decisions,
+          content: note.content,
+          detailLevel: note.detailLevel as any,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        },
+        actionItems.map((a) => ({
+          _id: a._id?.toString(),
+          userId: a.userId,
+          description: a.description,
+          assignee: a.assignee,
+          dueDate: a.dueDate,
+          priority: a.priority as any,
+          status: a.status as any,
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
+        })),
+        { to: recipient },
+      );
+
+      if (emailResult.success) {
+        return c.json({
+          success: true,
+          messageId: emailResult.messageId,
+        });
+      } else {
+        return c.json({ error: emailResult.error }, 500);
+      }
+    }
+
+    return c.json({ error: "Database not available" }, 503);
+  } catch (error) {
+    console.error("[API] Note email error:", error);
+    return c.json({ error: "Failed to send email" }, 500);
+  }
 });
 
 // ===========================================================================
@@ -992,11 +1084,72 @@ api.post("/research/scrape", async (c: Context) => {
  * POST /api/research/:id/email - Email research
  */
 api.post("/research/:id/email", async (c: Context) => {
-  const userId = requireAuth(c);
-  if (userId instanceof Response) return userId;
+  const result = requireSession(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
 
-  // TODO: Implement email via Resend
-  return c.json({ success: true, message: "Email queued" });
+  const researchId = c.req.param("id");
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const recipient = body.recipient || session.email.getDefaultRecipient();
+
+    if (!recipient) {
+      return c.json({ error: "No recipient email configured" }, 400);
+    }
+
+    if (!session.email.isAvailable()) {
+      return c.json({ error: "Email service not available" }, 503);
+    }
+
+    // Check session cache first
+    let research = session.research.getResult(researchId);
+
+    // Check database if not in cache
+    if (!research && isDBConnected()) {
+      const dbResearch = await ResearchResultModel.findOne({
+        _id: researchId,
+        userId,
+      });
+      if (dbResearch) {
+        research = {
+          _id: dbResearch._id?.toString(),
+          userId: dbResearch.userId,
+          query: dbResearch.query,
+          type: dbResearch.type as any,
+          summary: dbResearch.summary,
+          keyFacts: dbResearch.keyFacts,
+          sources: dbResearch.sources,
+          content: dbResearch.content,
+          createdAt: dbResearch.createdAt,
+        };
+      }
+    }
+
+    if (!research) {
+      return c.json({ error: "Research not found" }, 404);
+    }
+
+    // Send email
+    const emailResult = await session.email.sendResearchResults(
+      research as any,
+      {
+        to: recipient,
+      },
+    );
+
+    if (emailResult.success) {
+      return c.json({
+        success: true,
+        messageId: emailResult.messageId,
+      });
+    } else {
+      return c.json({ error: emailResult.error }, 500);
+    }
+  } catch (error) {
+    console.error("[API] Research email error:", error);
+    return c.json({ error: "Failed to send email" }, 500);
+  }
 });
 
 // ===========================================================================

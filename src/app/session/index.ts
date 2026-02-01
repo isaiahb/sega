@@ -17,6 +17,7 @@ export { MeetingManager } from "./MeetingManager";
 export { AgentManager } from "./AgentManager";
 export { NotesManager } from "./NotesManager";
 export { ResearchManager } from "./ResearchManager";
+export { EmailManager } from "./EmailManager";
 
 // Types
 export type {
