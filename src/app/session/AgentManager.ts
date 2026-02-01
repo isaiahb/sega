@@ -165,11 +165,17 @@ Analyze the transcript and respond with ONLY a JSON object (no markdown, no expl
   "commands": []                   // detected voice commands (see below)
 }
 
-For commands, look for phrases like "SEGA, research X" or "SEGA, take note of X":
+For commands, look for phrases like "SEGA, research X", "SEGA, take note of X", "SEGA, end meeting", or "SEGA, generate notes":
 {
-  "type": "research" | "note" | "email" | "remind",
+  "type": "research" | "note" | "email" | "remind" | "end_meeting" | "generate_notes",
   "content": string
-}`;
+}
+
+IMPORTANT: If someone says "SEGA, end meeting" or "SEGA, end the meeting" or "SEGA, wrap up", detect it as:
+{ "type": "end_meeting", "content": "" }
+
+If someone says "SEGA, generate notes" or "SEGA, create notes" or "SEGA, make notes", detect it as:
+{ "type": "generate_notes", "content": "" }`;
 
 /**
  * AgentManager - the brain that orchestrates SEGA
@@ -340,6 +346,21 @@ export class AgentManager {
 
     this.hasNewTranscripts = true;
 
+    // Check for direct voice commands (faster than waiting for LLM)
+    const directCommand = this.checkForDirectCommand(segment.text);
+    if (directCommand) {
+      this.deps.logger.info(
+        `[AgentManager] Direct command detected: ${directCommand.type}`,
+      );
+      this.handleCommand(
+        directCommand,
+        this.deps.settings.getAutonomyLevel(),
+      ).catch((err) => {
+        this.deps.logger.error("[AgentManager] Direct command error:", err);
+      });
+      return; // Skip regular analysis for direct commands
+    }
+
     // Check for immediate trigger keywords
     if (this.shouldTriggerImmediately(segment.text)) {
       this.deps.logger.info(
@@ -403,6 +424,51 @@ export class AgentManager {
   private shouldTriggerImmediately(text: string): boolean {
     const lower = text.toLowerCase();
     return TRIGGER_KEYWORDS.some((keyword) => lower.includes(keyword));
+  }
+
+  /**
+   * Check for direct voice commands that don't need LLM analysis
+   * These are faster and more reliable for common actions
+   */
+  private checkForDirectCommand(
+    text: string,
+  ): { type: string; content: string } | null {
+    const lower = text.toLowerCase();
+
+    // Must contain "sega" to be a command
+    if (!lower.includes("sega")) return null;
+
+    // End meeting commands
+    if (
+      lower.includes("end meeting") ||
+      lower.includes("end the meeting") ||
+      lower.includes("wrap up") ||
+      lower.includes("finish meeting") ||
+      lower.includes("stop meeting")
+    ) {
+      return { type: "end_meeting", content: "" };
+    }
+
+    // Generate notes commands
+    if (
+      lower.includes("generate notes") ||
+      lower.includes("create notes") ||
+      lower.includes("make notes") ||
+      lower.includes("write notes") ||
+      lower.includes("take notes")
+    ) {
+      return { type: "generate_notes", content: "" };
+    }
+
+    // Research commands - extract the query
+    const researchMatch = lower.match(
+      /sega[,.]?\s*(?:research|look up|find|search)\s+(.+)/i,
+    );
+    if (researchMatch) {
+      return { type: "research", content: researchMatch[1].trim() };
+    }
+
+    return null;
   }
 
   // ===========================================================================
@@ -693,6 +759,52 @@ export class AgentManager {
       case "remind":
         this.deps.display.showNotification(`⏰ Reminder set`);
         this.pendingCommands.push(command);
+        break;
+
+      case "end_meeting":
+        if (this.deps.meeting.isInMeeting()) {
+          this.deps.display.showMessage(`✅ Ending meeting...`, {
+            duration: 2000,
+          });
+          await this.handleMeetingEnded(autonomyLevel);
+        } else {
+          this.deps.display.showMessage(`No active meeting`, {
+            duration: 2000,
+          });
+        }
+        break;
+
+      case "generate_notes":
+        if (this.deps.meeting.isInMeeting()) {
+          // End meeting first, then generate notes
+          this.deps.display.showMessage(`📝 Generating notes...`, {
+            duration: 2000,
+          });
+          await this.handleMeetingEnded(autonomyLevel);
+        } else {
+          // Try to generate notes for last meeting
+          const recentMeetings = this.deps.meeting.getRecentMeetings();
+          if (recentMeetings.length > 0 && this.deps.notes) {
+            const lastMeeting = recentMeetings[0];
+            this.deps.display.showMessage(`📝 Generating notes...`, {
+              duration: 2000,
+            });
+            this.setState("processing");
+            try {
+              await this.deps.notes.generateNotes(lastMeeting._id!);
+            } catch (error) {
+              this.deps.logger.error(
+                "[AgentManager] Note generation failed:",
+                error,
+              );
+            }
+            this.setState("idle");
+          } else {
+            this.deps.display.showMessage(`No meeting to generate notes for`, {
+              duration: 2000,
+            });
+          }
+        }
         break;
 
       default:
