@@ -16,6 +16,7 @@ import { clsx } from "clsx";
 import { useSSE } from "./hooks/useSSE";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
+import { api } from "./api/client";
 
 // Views
 import { TodayView } from "./views/TodayView";
@@ -27,12 +28,11 @@ import { HelpView } from "./views/HelpView";
 import { LandingView } from "./views/LandingView";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 
-
 // =============================================================================
 // Types
 // =============================================================================
 
-type ViewType = 'today' | 'notes' | 'actions' | 'agents' | 'settings' | 'help';
+type ViewType = "today" | "notes" | "actions" | "agents" | "settings" | "help";
 
 // =============================================================================
 // App Component
@@ -40,18 +40,41 @@ type ViewType = 'today' | 'notes' | 'actions' | 'agents' | 'settings' | 'help';
 
 export function App() {
   const { userId, isLoading, error, isAuthenticated } = useMentraAuth();
+
+  // Track if API client has been initialized with userId
+  const [apiReady, setApiReady] = useState(false);
+
+  // Set API client userId SYNCHRONOUSLY via useMemo (runs before children render)
+  // This ensures the API client has the userId before any child components make API calls
+  useMemo(() => {
+    if (userId) {
+      api.setUserId(userId);
+      console.log("[App] API client userId set (sync):", userId);
+    }
+  }, [userId]);
+
+  // Also track in state for re-renders
+  useEffect(() => {
+    if (userId && !apiReady) {
+      setApiReady(true);
+      console.log("[App] API ready for requests");
+    }
+  }, [userId, apiReady]);
+
   const { isConnected } = useSSE(userId || null);
 
   // App state
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeView, setActiveView] = useState<ViewType>('today');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [currentRoute, setCurrentRoute] = useState<'/' | '/app' | '/onboarding'>(
-    window.location.pathname === '/onboarding'
-      ? '/onboarding'
-      : window.location.pathname === '/app'
-      ? '/app'
-      : '/'
+  const [activeView, setActiveView] = useState<ViewType>("today");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [currentRoute, setCurrentRoute] = useState<
+    "/" | "/app" | "/onboarding"
+  >(
+    window.location.pathname === "/onboarding"
+      ? "/onboarding"
+      : window.location.pathname === "/app"
+        ? "/app"
+        : "/",
   );
 
   // Check if on onboarding page or landing page
@@ -60,14 +83,11 @@ export function App() {
     [currentRoute],
   );
 
-  const isLanding = useMemo(
-    () => currentRoute === "/",
-    [currentRoute],
-  );
+  const isLanding = useMemo(() => currentRoute === "/", [currentRoute]);
 
   // Toggle Theme Function
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
   // Keyboard Navigation for Views
@@ -75,15 +95,15 @@ export function App() {
     const down = (e: KeyboardEvent) => {
       if (e.key === "1" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setActiveView('today');
+        setActiveView("today");
       }
       if (e.key === "3" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setActiveView('notes');
+        setActiveView("notes");
       }
       if (e.key === "5" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setActiveView('actions');
+        setActiveView("actions");
       }
     };
     document.addEventListener("keydown", down);
@@ -94,17 +114,17 @@ export function App() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      if (path === '/onboarding') {
-        setCurrentRoute('/onboarding');
-      } else if (path === '/app') {
-        setCurrentRoute('/app');
+      if (path === "/onboarding") {
+        setCurrentRoute("/onboarding");
+      } else if (path === "/app") {
+        setCurrentRoute("/app");
       } else {
-        setCurrentRoute('/');
+        setCurrentRoute("/");
       }
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   // Loading state
@@ -121,9 +141,13 @@ export function App() {
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             className="w-16 h-16 rounded-2xl bg-zinc-900 dark:bg-white flex items-center justify-center shadow-lg"
           >
-            <span className="text-white dark:text-zinc-900 font-bold text-2xl">E</span>
+            <span className="text-white dark:text-zinc-900 font-bold text-2xl">
+              E
+            </span>
           </motion.div>
-          <p className="text-zinc-500 dark:text-zinc-400">Loading Executive Lens...</p>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            Loading Executive Lens...
+          </p>
         </motion.div>
       </div>
     );
@@ -155,10 +179,10 @@ export function App() {
 
   // Route navigation handler
   const handleRouteNavigate = (path: string) => {
-    window.history.pushState({}, '', path);
-    setCurrentRoute(path as '/' | '/app' | '/onboarding');
-    if (path === '/app') {
-      setActiveView('today');
+    window.history.pushState({}, "", path);
+    setCurrentRoute(path as "/" | "/app" | "/onboarding");
+    if (path === "/app") {
+      setActiveView("today");
     }
   };
 
@@ -167,7 +191,7 @@ export function App() {
     return (
       <OnboardingWizard
         userId={userId || ""}
-        onComplete={() => handleRouteNavigate('/app')}
+        onComplete={() => handleRouteNavigate("/app")}
       />
     );
   }
@@ -182,14 +206,26 @@ export function App() {
 
   // Render view based on activeView
   const renderView = () => {
-    switch(activeView) {
-      case 'today': return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
-      case 'notes': return <NotesView />;
-      case 'actions': return <ActionsView />;
-      case 'agents': return <AgentsView />;
-      case 'settings': return <SettingsView isDarkMode={theme === 'dark'} onToggleTheme={toggleTheme} />;
-      case 'help': return <HelpView />;
-      default: return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
+    switch (activeView) {
+      case "today":
+        return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
+      case "notes":
+        return <NotesView />;
+      case "actions":
+        return <ActionsView />;
+      case "agents":
+        return <AgentsView />;
+      case "settings":
+        return (
+          <SettingsView
+            isDarkMode={theme === "dark"}
+            onToggleTheme={toggleTheme}
+          />
+        );
+      case "help":
+        return <HelpView />;
+      default:
+        return <TodayView onNavigate={handleNavigate} userId={userId || ""} />;
     }
   };
 
@@ -198,7 +234,12 @@ export function App() {
   };
 
   return (
-    <div className={clsx("flex h-screen w-full font-sans bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 selection:bg-zinc-200 dark:selection:bg-zinc-800", theme)}>
+    <div
+      className={clsx(
+        "flex h-screen w-full font-sans bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 selection:bg-zinc-200 dark:selection:bg-zinc-800",
+        theme,
+      )}
+    >
       <Toaster position="top-center" theme={theme} />
 
       {/* Sidebar */}
@@ -210,7 +251,6 @@ export function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-black relative transition-all duration-300">
-
         <TopBar
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
@@ -219,10 +259,7 @@ export function App() {
           isConnected={isConnected}
         />
 
-        <main className="flex-1 overflow-hidden relative">
-          {renderView()}
-        </main>
-
+        <main className="flex-1 overflow-hidden relative">{renderView()}</main>
       </div>
     </div>
   );

@@ -80,7 +80,12 @@ export class BroadcastManager {
           clientId,
         });
 
-        console.log(`[SSE] Client connected: ${clientId} (user: ${this.userId})`);
+        console.log(
+          `[SSE] Client connected: ${clientId} (user: ${this.userId})`,
+        );
+        console.log(
+          `[SSE] Global clients now: ${BroadcastManager.globalClients.size} total`,
+        );
       },
       cancel: () => {
         if (client) {
@@ -94,7 +99,7 @@ export class BroadcastManager {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
         "Access-Control-Allow-Origin": "*",
         "X-Accel-Buffering": "no", // Disable nginx buffering
       },
@@ -103,6 +108,8 @@ export class BroadcastManager {
 
   /**
    * Broadcast an event to all clients for this user
+   * Uses the global client registry to reach ALL clients for this userId,
+   * not just the ones registered with this instance.
    */
   broadcast(event: AnySSEEvent | Record<string, unknown>): void {
     const payload = {
@@ -110,9 +117,9 @@ export class BroadcastManager {
       timestamp: event.timestamp || Date.now(),
     };
 
-    for (const client of this.clients) {
-      this.sendToClient(client, payload);
-    }
+    // Use static method to broadcast to ALL clients for this user
+    // This ensures events reach clients even if they connected before the session was created
+    BroadcastManager.broadcastToUser(this.userId, payload);
   }
 
   /**
@@ -120,7 +127,7 @@ export class BroadcastManager {
    */
   emit<T extends SSEEventType>(
     type: T,
-    data: Omit<Extract<AnySSEEvent, { type: T }>, "type" | "timestamp">
+    data: Omit<Extract<AnySSEEvent, { type: T }>, "type" | "timestamp">,
   ): void {
     this.broadcast({
       type,
@@ -133,6 +140,24 @@ export class BroadcastManager {
    * Send transcript update
    */
   sendTranscript(text: string, isFinal: boolean, speakerHint?: string): void {
+    console.log(
+      `[BroadcastManager] Sending transcript to user ${this.userId}: "${text.substring(0, 50)}..." (isFinal: ${isFinal})`,
+    );
+    console.log(
+      `[BroadcastManager] Global clients count: ${BroadcastManager.globalClients.size}`,
+    );
+
+    // Count clients for this user
+    let userClientCount = 0;
+    for (const client of BroadcastManager.globalClients) {
+      if (client.userId === this.userId) {
+        userClientCount++;
+      }
+    }
+    console.log(
+      `[BroadcastManager] Clients for user ${this.userId}: ${userClientCount}`,
+    );
+
     this.broadcast({
       type: "transcript",
       timestamp: Date.now(),
@@ -149,7 +174,7 @@ export class BroadcastManager {
     meetingId: string,
     title: string,
     category: string,
-    startTime: Date
+    startTime: Date,
   ): void {
     this.broadcast({
       type: "meeting_started",
@@ -180,7 +205,7 @@ export class BroadcastManager {
     noteId: string,
     meetingId: string,
     title: string,
-    summary: string
+    summary: string,
   ): void {
     this.broadcast({
       type: "notes_ready",
@@ -199,7 +224,7 @@ export class BroadcastManager {
     researchId: string,
     query: string,
     progress: number,
-    currentStep: string
+    currentStep: string,
   ): void {
     this.broadcast({
       type: "research_progress",
@@ -315,15 +340,27 @@ export class BroadcastManager {
     const message = `data: ${JSON.stringify(payload)}\n\n`;
     const encoded = new TextEncoder().encode(message);
 
+    // Debug: count clients for this user
+    let clientCount = 0;
+    let sentCount = 0;
+
     for (const client of BroadcastManager.globalClients) {
       if (client.userId === userId) {
+        clientCount++;
         try {
           client.controller.enqueue(encoded);
+          sentCount++;
         } catch {
           // Client disconnected, will be cleaned up by its manager
         }
       }
     }
+
+    // Log broadcast info
+    const eventType = (data as any).type || "unknown";
+    console.log(
+      `[BroadcastManager.broadcastToUser] userId=${userId} event=${eventType} globalClients=${BroadcastManager.globalClients.size} userClients=${clientCount} sent=${sentCount}`,
+    );
   }
 
   /**

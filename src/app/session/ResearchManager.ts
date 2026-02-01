@@ -44,7 +44,7 @@ export interface ResearchManagerDeps {
       researchId: string,
       query: string,
       progress: number,
-      currentStep: string
+      currentStep: string,
     ) => void;
     broadcast: (data: Record<string, unknown>) => void;
   };
@@ -53,6 +53,8 @@ export interface ResearchManagerDeps {
     showResearchComplete: (summary: string) => void;
     showError: (message: string) => void;
     showMessage: (text: string, options?: { duration?: number }) => void;
+    showDashboardResearching: (query?: string) => void;
+    showDashboardIdle: () => void;
   };
 }
 
@@ -129,12 +131,12 @@ export class ResearchManager {
       } catch (error) {
         this.deps.logger.warn(
           "[ResearchManager] Failed to initialize Firecrawl:",
-          error
+          error,
         );
       }
     } else {
       this.deps.logger.warn(
-        "[ResearchManager] No FIRECRAWL_API_KEY - research disabled"
+        "[ResearchManager] No FIRECRAWL_API_KEY - research disabled",
       );
     }
 
@@ -144,7 +146,7 @@ export class ResearchManager {
       this.deps.logger.info("[ResearchManager] LLM provider initialized");
     } catch (error) {
       this.deps.logger.warn(
-        "[ResearchManager] No LLM provider - synthesis disabled"
+        "[ResearchManager] No LLM provider - synthesis disabled",
       );
     }
 
@@ -160,7 +162,7 @@ export class ResearchManager {
    */
   async startResearch(
     query: string,
-    type: "person" | "company" | "topic" | "general" = "general"
+    type: "person" | "company" | "topic" | "general" = "general",
   ): Promise<ResearchResult | null> {
     if (!this.firecrawlAvailable) {
       this.deps.logger.error("[ResearchManager] Firecrawl not available");
@@ -184,21 +186,32 @@ export class ResearchManager {
     this.activeResearch.set(researchId, request);
 
     this.deps.logger.info(
-      `[ResearchManager] Starting research: "${query}" (${type})`
+      `[ResearchManager] Starting research: "${query}" (${type})`,
     );
-    this.deps.display.showMessage(`🔍 Researching: ${query}`, { duration: 3000 });
+    this.deps.display.showMessage(`🔍 Researching: ${query}`, {
+      duration: 3000,
+    });
 
     try {
       // Update status
       request.status = "in_progress";
-      this.broadcastProgress(researchId, query, 10, "Generating search queries");
+      this.broadcastProgress(
+        researchId,
+        query,
+        10,
+        "Generating search queries",
+      );
 
       // Generate optimized search queries
       const searchQueries = await this.generateSearchQueries(query, type);
       this.broadcastProgress(researchId, query, 20, "Searching the web");
 
       // Search and scrape
-      const sources = await this.searchAndScrape(searchQueries, researchId, query);
+      const sources = await this.searchAndScrape(
+        searchQueries,
+        researchId,
+        query,
+      );
       this.broadcastProgress(researchId, query, 70, "Synthesizing results");
 
       if (sources.length === 0) {
@@ -209,7 +222,12 @@ export class ResearchManager {
       }
 
       // Synthesize with LLM
-      const result = await this.synthesizeResults(query, type, sources, researchId);
+      const result = await this.synthesizeResults(
+        query,
+        type,
+        sources,
+        researchId,
+      );
 
       if (!result) {
         request.status = "failed";
@@ -238,7 +256,7 @@ export class ResearchManager {
 
       this.deps.display.showResearchComplete(result.summary);
       this.deps.logger.info(
-        `[ResearchManager] Research complete: "${query}" (${result.sources.length} sources)`
+        `[ResearchManager] Research complete: "${query}" (${result.sources.length} sources)`,
       );
 
       return result;
@@ -281,7 +299,10 @@ export class ResearchManager {
         url,
       };
     } catch (error) {
-      this.deps.logger.error(`[ResearchManager] Scrape error for ${url}:`, error);
+      this.deps.logger.error(
+        `[ResearchManager] Scrape error for ${url}:`,
+        error,
+      );
       return null;
     }
   }
@@ -320,7 +341,7 @@ Respond with ONLY a JSON array of strings:
 
       const response = await this.provider.chat(
         [{ role: "user", content: prompt }],
-        { tier: "fast", maxTokens: 512, temperature: 0.3 }
+        { tier: "fast", maxTokens: 512, temperature: 0.3 },
       );
 
       const text = extractText(response);
@@ -362,7 +383,9 @@ Respond with ONLY a JSON array of strings:
     if (request) {
       request.status = "failed";
       this.activeResearch.delete(researchId);
-      this.deps.logger.info(`[ResearchManager] Cancelled research: ${researchId}`);
+      this.deps.logger.info(
+        `[ResearchManager] Cancelled research: ${researchId}`,
+      );
     }
   }
 
@@ -396,7 +419,7 @@ Respond with ONLY a JSON array of strings:
    */
   private async generateSearchQueries(
     query: string,
-    type: string
+    type: string,
   ): Promise<string[]> {
     // If no LLM, use the query directly with type-specific prefixes
     if (!this.provider) {
@@ -410,13 +433,14 @@ Respond with ONLY a JSON array of strings:
     }
 
     try {
-      const prompt = SEARCH_QUERY_PROMPT
-        .replace("{{QUERY}}", query)
-        .replace("{{TYPE}}", type);
+      const prompt = SEARCH_QUERY_PROMPT.replace("{{QUERY}}", query).replace(
+        "{{TYPE}}",
+        type,
+      );
 
       const response = await this.provider.chat(
         [{ role: "user", content: prompt }],
-        { tier: "fast", maxTokens: 256, temperature: 0.5 }
+        { tier: "fast", maxTokens: 256, temperature: 0.5 },
       );
 
       const text = extractText(response);
@@ -430,7 +454,7 @@ Respond with ONLY a JSON array of strings:
     } catch (error) {
       this.deps.logger.warn(
         "[ResearchManager] Failed to generate search queries:",
-        error
+        error,
       );
       return [query];
     }
@@ -442,7 +466,7 @@ Respond with ONLY a JSON array of strings:
   private async searchAndScrape(
     queries: string[],
     researchId: string,
-    originalQuery: string
+    originalQuery: string,
   ): Promise<Array<{ title: string; content: string; url: string }>> {
     if (!this.firecrawl) {
       return [];
@@ -459,7 +483,7 @@ Respond with ONLY a JSON array of strings:
           researchId,
           originalQuery,
           Math.round(progress),
-          `Searching: ${query}`
+          `Searching: ${query}`,
         );
 
         // Use Firecrawl search
@@ -487,7 +511,7 @@ Respond with ONLY a JSON array of strings:
       } catch (error) {
         this.deps.logger.warn(
           `[ResearchManager] Search failed for "${query}":`,
-          error
+          error,
         );
       }
     }
@@ -502,7 +526,7 @@ Respond with ONLY a JSON array of strings:
     query: string,
     type: string,
     sources: Array<{ title: string; content: string; url: string }>,
-    researchId: string
+    researchId: string,
   ): Promise<ResearchResult | null> {
     this.broadcastProgress(researchId, query, 80, "Synthesizing findings");
 
@@ -510,7 +534,7 @@ Respond with ONLY a JSON array of strings:
     const sourcesText = sources
       .map(
         (s, i) =>
-          `Source ${i + 1}: ${s.title}\nURL: ${s.url}\nContent:\n${s.content.substring(0, 1500)}\n`
+          `Source ${i + 1}: ${s.title}\nURL: ${s.url}\nContent:\n${s.content.substring(0, 1500)}\n`,
       )
       .join("\n---\n");
 
@@ -529,21 +553,22 @@ Respond with ONLY a JSON array of strings:
           title: s.title,
           snippet: s.content.substring(0, 200),
         })),
-        content: sources.map((s) => `## ${s.title}\n\n${s.content}`).join("\n\n"),
+        content: sources
+          .map((s) => `## ${s.title}\n\n${s.content}`)
+          .join("\n\n"),
         completedAt: new Date(),
         createdAt: new Date(),
       };
     }
 
     try {
-      const prompt = RESEARCH_SYNTHESIS_PROMPT
-        .replace("{{QUERY}}", query)
+      const prompt = RESEARCH_SYNTHESIS_PROMPT.replace("{{QUERY}}", query)
         .replace("{{TYPE}}", type)
         .replace("{{SOURCES}}", sourcesText);
 
       const response = await this.provider.chat(
         [{ role: "user", content: prompt }],
-        { tier: "smart", maxTokens: 2048, temperature: 0.5 }
+        { tier: "smart", maxTokens: 2048, temperature: 0.5 },
       );
 
       const text = extractText(response);
@@ -601,7 +626,7 @@ Respond with ONLY a JSON array of strings:
     } catch (error) {
       this.deps.logger.error(
         "[ResearchManager] Failed to parse synthesis response:",
-        error
+        error,
       );
       return null;
     }
@@ -614,13 +639,13 @@ Respond with ONLY a JSON array of strings:
     researchId: string,
     query: string,
     progress: number,
-    currentStep: string
+    currentStep: string,
   ): void {
     this.deps.broadcast.sendResearchProgress(
       researchId,
       query,
       progress,
-      currentStep
+      currentStep,
     );
     this.deps.display.showResearchProgress(query, progress);
   }

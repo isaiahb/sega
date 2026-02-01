@@ -5,8 +5,8 @@
  * Used when API calls fail or data cannot be loaded.
  */
 
-import { AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '../ui/button';
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "../ui/button";
 
 export interface ErrorStateProps {
   title?: string;
@@ -21,21 +21,23 @@ export interface ErrorStateProps {
  * Main ErrorState component
  */
 export function ErrorState({
-  title = 'Failed to Load',
+  title = "Failed to Load",
   message,
   error,
   onRetry,
   onClose,
   showDetails = false,
 }: ErrorStateProps) {
-  const errorDetails = typeof error === 'string' ? error : error?.message;
+  const errorDetails = typeof error === "string" ? error : error?.message;
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
       <div className="flex items-center gap-3">
         <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
         <div>
-          <h3 className="font-semibold text-red-900 dark:text-red-100">{title}</h3>
+          <h3 className="font-semibold text-red-900 dark:text-red-100">
+            {title}
+          </h3>
           <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
         </div>
       </div>
@@ -73,7 +75,7 @@ export function ErrorState({
  */
 export function ErrorMessage({
   message,
-  className = '',
+  className = "",
 }: {
   message: string;
   className?: string;
@@ -91,15 +93,11 @@ export function ErrorMessage({
 /**
  * Connection error - specific message for backend unavailable
  */
-export function ConnectionErrorState({
-  onRetry,
-}: {
-  onRetry?: () => void;
-}) {
+export function ConnectionErrorState({ onRetry }: { onRetry?: () => void }) {
   return (
     <ErrorState
       title="Connection Failed"
-      message="Unable to connect to the backend. Showing cached data or demo content."
+      message="Unable to connect to the backend. Please check your connection and try again."
       showDetails={false}
       onRetry={onRetry}
     />
@@ -110,8 +108,8 @@ export function ConnectionErrorState({
  * No data state
  */
 export function NoDataState({
-  title = 'No Data',
-  message = 'No data available yet.',
+  title = "No Data",
+  message = "No data available yet.",
   icon: Icon = AlertCircle,
 }: {
   title?: string;
@@ -136,11 +134,7 @@ export function NoDataState({
 /**
  * Timeout error
  */
-export function TimeoutErrorState({
-  onRetry,
-}: {
-  onRetry?: () => void;
-}) {
+export function TimeoutErrorState({ onRetry }: { onRetry?: () => void }) {
   return (
     <ErrorState
       title="Request Timed Out"
@@ -165,11 +159,7 @@ export function PermissionErrorState() {
 /**
  * Server error
  */
-export function ServerErrorState({
-  onRetry,
-}: {
-  onRetry?: () => void;
-}) {
+export function ServerErrorState({ onRetry }: { onRetry?: () => void }) {
   return (
     <ErrorState
       title="Server Error"
