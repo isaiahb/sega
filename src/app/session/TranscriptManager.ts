@@ -177,6 +177,27 @@ export class TranscriptManager {
   }
 
   /**
+   * Get ALL transcript text for today (entire buffer)
+   * Used for generating notes from the full day's conversation
+   */
+  getTodayFullText(finalOnly: boolean = true): string {
+    let segments = this.buffer;
+
+    if (finalOnly) {
+      segments = segments.filter((s) => s.isFinal);
+    }
+
+    return segments.map((s) => s.text).join(" ");
+  }
+
+  /**
+   * Get segment count for today
+   */
+  getTodaySegmentCount(): number {
+    return this.daySegmentCount;
+  }
+
+  /**
    * Get transcript text within a range of indices
    * Used for meeting transcript retrieval
    */

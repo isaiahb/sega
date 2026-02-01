@@ -40,6 +40,8 @@ export interface AgentManagerDeps {
       finalOnly?: boolean,
     ) => TranscriptSegment[];
     getRecentText: (count?: number, finalOnly?: boolean) => string;
+    getTodayFullText: (finalOnly?: boolean) => string;
+    getTodaySegmentCount: () => number;
     getCurrentIndex: () => number;
   };
   meeting: {
@@ -793,13 +795,17 @@ export class AgentManager {
       return;
     }
 
-    // No active meeting - create one from recent transcripts (last 2 hours)
+    // No active meeting - create one from ALL of today's transcripts
     this.deps.logger.info(
-      "[AgentManager] No active meeting - creating from recent transcripts",
+      "[AgentManager] No active meeting - creating from today's full transcript",
     );
 
-    // Get recent transcript text (last 100 segments or ~2 hours worth)
-    const recentText = this.deps.transcript.getRecentText(100, true);
+    // Get ALL transcript text for today
+    const recentText = this.deps.transcript.getTodayFullText(true);
+    const segmentCount = this.deps.transcript.getTodaySegmentCount();
+    this.deps.logger.info(
+      `[AgentManager] Found ${segmentCount} segments for today`,
+    );
 
     if (!recentText || recentText.length < 50) {
       this.deps.display.showMessage(
