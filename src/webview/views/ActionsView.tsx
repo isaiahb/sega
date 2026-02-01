@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Kanban,
   List,
@@ -11,9 +11,12 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { mockFolders } from '../lib/mockData';
+import { api, type ActionItem } from '../api/client';
+import { fetchWithFallback } from '../lib/devMode';
+import { SkeletonLoader, ErrorState } from '../components/shared';
 
 // Flatten actions from notes for demo
-const allActions = mockFolders.flatMap(f =>
+const mockAllActions = mockFolders.flatMap(f =>
   (f.notes || []).flatMap(n =>
     n.actionItems.map(a => ({
       ...a,
@@ -25,6 +28,99 @@ const allActions = mockFolders.flatMap(f =>
 
 export const ActionsView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [allActions, setAllActions] = useState(mockAllActions);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(true);
+
+  // Load actions from backend
+  useEffect(() => {
+    loadActions();
+  }, []);
+
+  const loadActions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: realActions, isMock } = await fetchWithFallback(
+        () => api.getActionItems(),
+        [],
+        'Failed to load action items from backend'
+      );
+
+      setUsingMockData(isMock);
+
+      if (realActions && realActions.length > 0) {
+        // Transform backend ActionItem to UI format
+        const transformed = realActions.map((action: ActionItem, idx) => ({
+          id: action.id,
+          text: action.task,
+          priority: action.priority,
+          owner: action.owner,
+          done: action.status === 'done',
+          dueDate: action.dueDate,
+          noteTitle: action.sourceMeetingId ? `Meeting ${action.sourceMeetingId}` : 'Manual Entry',
+          date: action.sourceMeetingId ? new Date().toISOString().split('T')[0] : undefined,
+        }));
+        setAllActions(transformed);
+      } else if (!isMock) {
+        setAllActions([]);
+      } else {
+        setAllActions(mockAllActions);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      setUsingMockData(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateActionStatus = async (actionId: string, newStatus: 'todo' | 'in_progress' | 'done') => {
+    // Optimistic update
+    const oldActions = [...allActions];
+    setAllActions(allActions.map((a: any) =>
+      a.id === actionId ? { ...a, done: newStatus === 'done' } : a
+    ));
+
+    try {
+      await api.updateActionItem(actionId, { status: newStatus });
+    } catch (err) {
+      // Rollback on error
+      setAllActions(oldActions);
+      console.error('Failed to update action:', err);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-black">
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 flex-shrink-0">
+          <h1 className="text-lg font-bold text-zinc-900 dark:text-white">Action Items</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6">
+          <SkeletonLoader variant="list" count={5} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && !usingMockData) {
+    return (
+      <div className="flex flex-col h-full bg-white dark:bg-black">
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 flex-shrink-0">
+          <h1 className="text-lg font-bold text-zinc-900 dark:text-white">Action Items</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6 flex items-center justify-center">
+          <ErrorState message={error} onRetry={loadActions} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black">
@@ -84,9 +180,12 @@ export const ActionsView: React.FC = () => {
                    {/* Rows */}
                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                        {allActions.length > 0 ? allActions.map((action, i) => (
-                           <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
+                           <div key={action.id || i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
                                <div className="col-span-5 flex items-start gap-3">
-                                   <button className={clsx("mt-0.5 transition-colors", action.done ? "text-emerald-500" : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500 dark:hover:text-emerald-400")}>
+                                   <button
+                                     onClick={() => updateActionStatus(action.id, action.done ? 'todo' : 'done')}
+                                     className={clsx("mt-0.5 transition-colors", action.done ? "text-emerald-500" : "text-zinc-300 dark:text-zinc-600 hover:text-emerald-500 dark:hover:text-emerald-400")}
+                                   >
                                        {action.done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                                    </button>
                                    <div>
