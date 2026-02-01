@@ -406,6 +406,236 @@ api.get("/settings/sensitive-topics", async (c: Context) => {
 });
 
 // ===========================================================================
+// Research Endpoints
+// ===========================================================================
+
+/**
+ * Start a research query
+ * POST /api/research
+ * Body: { query: string, type?: "person" | "company" | "topic" | "general" }
+ */
+api.post("/research", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  if (!session.research.isAvailable()) {
+    return c.json(
+      { error: "Research not available (FIRECRAWL_API_KEY not set)" },
+      503,
+    );
+  }
+
+  try {
+    const body = await c.req.json();
+    const query = body.query as string;
+    const type =
+      (body.type as "person" | "company" | "topic" | "general") || "general";
+
+    if (!query || query.trim() === "") {
+      return c.json({ error: "query is required" }, 400);
+    }
+
+    // Start research (async - will broadcast progress via SSE)
+    const result = await session.research.startResearch(query.trim(), type);
+
+    if (!result) {
+      return c.json({ error: "Research failed" }, 500);
+    }
+
+    return c.json({
+      success: true,
+      result: {
+        id: result._id,
+        query: result.query,
+        type: result.type,
+        summary: result.summary,
+        keyFacts: result.keyFacts,
+        sources: result.sources,
+      },
+    });
+  } catch (error) {
+    console.error("[API] Research error:", error);
+    return c.json({ error: "Research failed" }, 500);
+  }
+});
+
+/**
+ * Get research status
+ * GET /api/research/status
+ */
+api.get("/research/status", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  return c.json({
+    success: true,
+    available: session.research.isAvailable(),
+    isResearching: session.research.isResearching(),
+    activeResearch: session.research.getActiveResearch(),
+  });
+});
+
+/**
+ * Get research result by ID
+ * GET /api/research/:id
+ */
+api.get("/research/:id", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  const researchId = c.req.param("id");
+  const result = session.research.getResult(researchId);
+
+  if (!result) {
+    return c.json({ error: "Research result not found" }, 404);
+  }
+
+  return c.json({
+    success: true,
+    result,
+  });
+});
+
+/**
+ * Get all cached research results
+ * GET /api/research/results
+ */
+api.get("/research/results", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  return c.json({
+    success: true,
+    results: session.research.getAllResults(),
+  });
+});
+
+/**
+ * Quick research - returns just key facts
+ * POST /api/research/quick
+ * Body: { query: string }
+ */
+api.post("/research/quick", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  if (!session.research.isAvailable()) {
+    return c.json({ error: "Research not available" }, 503);
+  }
+
+  try {
+    const body = await c.req.json();
+    const query = body.query as string;
+
+    if (!query || query.trim() === "") {
+      return c.json({ error: "query is required" }, 400);
+    }
+
+    const facts = await session.research.quickResearch(query.trim());
+
+    return c.json({
+      success: true,
+      query,
+      facts,
+    });
+  } catch (error) {
+    console.error("[API] Quick research error:", error);
+    return c.json({ error: "Quick research failed" }, 500);
+  }
+});
+
+/**
+ * Scrape a specific URL
+ * POST /api/research/scrape
+ * Body: { url: string }
+ */
+api.post("/research/scrape", async (c: Context) => {
+  // @ts-ignore
+  const userId = c.get("authUserId") as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const session = UserSession.get(userId);
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
+  if (!session.research.isAvailable()) {
+    return c.json({ error: "Research not available" }, 503);
+  }
+
+  try {
+    const body = await c.req.json();
+    const url = body.url as string;
+
+    if (!url || !url.startsWith("http")) {
+      return c.json({ error: "Valid URL is required" }, 400);
+    }
+
+    const result = await session.research.scrapeUrl(url);
+
+    if (!result) {
+      return c.json({ error: "Failed to scrape URL" }, 500);
+    }
+
+    return c.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    console.error("[API] Scrape error:", error);
+    return c.json({ error: "Scrape failed" }, 500);
+  }
+});
+
+// ===========================================================================
 // 404 Handler
 // ===========================================================================
 
@@ -416,6 +646,6 @@ api.all("*", (c: Context) => {
       path: c.req.path,
       method: c.req.method,
     },
-    404
+    404,
   );
 });

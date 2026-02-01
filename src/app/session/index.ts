@@ -16,6 +16,7 @@ export { SettingsManager } from "./SettingsManager";
 export { MeetingManager } from "./MeetingManager";
 export { AgentManager } from "./AgentManager";
 export { NotesManager } from "./NotesManager";
+export { ResearchManager } from "./ResearchManager";
 
 // Types
 export type {

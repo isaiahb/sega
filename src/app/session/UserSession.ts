@@ -17,6 +17,7 @@ import { SettingsManager } from "./SettingsManager";
 import { MeetingManager } from "./MeetingManager";
 import { AgentManager } from "./AgentManager";
 import { NotesManager } from "./NotesManager";
+import { ResearchManager } from "./ResearchManager";
 
 /**
  * Logger interface for session logging
@@ -130,8 +131,8 @@ export class UserSession {
   /** Note generation and action item extraction */
   readonly notes: NotesManager;
 
-  // TODO: Add in Phase 3
-  // readonly research: ResearchManager;
+  /** Deep web research using Firecrawl */
+  readonly research: ResearchManager;
 
   /** Whether the session has been initialized */
   private initialized: boolean = false;
@@ -194,7 +195,16 @@ export class UserSession {
       display: this.display,
     });
 
-    // AgentManager needs userId, logger, transcript, meeting, settings, broadcast, display, notes
+    // ResearchManager needs userId, logger, meeting, broadcast, display
+    this.research = new ResearchManager({
+      userId: this.userId,
+      logger: this.logger,
+      meeting: this.meeting,
+      broadcast: this.broadcast,
+      display: this.display,
+    });
+
+    // AgentManager needs userId, logger, transcript, meeting, settings, broadcast, display, notes, research
     this.agent = new AgentManager({
       userId: this.userId,
       logger: this.logger,
@@ -204,6 +214,7 @@ export class UserSession {
       broadcast: this.broadcast,
       display: this.display,
       notes: this.notes,
+      research: this.research,
     });
 
     this.logger.info(`[UserSession] Created for ${userId}`);
@@ -293,6 +304,7 @@ export class UserSession {
     try {
       // Dispose managers in reverse order of dependency
       this.agent.dispose();
+      this.research.dispose();
       this.notes.dispose();
       this.meeting.dispose();
       this.settings.dispose();
