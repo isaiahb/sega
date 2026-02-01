@@ -762,49 +762,8 @@ export class AgentManager {
         break;
 
       case "end_meeting":
-        if (this.deps.meeting.isInMeeting()) {
-          this.deps.display.showMessage(`✅ Ending meeting...`, {
-            duration: 2000,
-          });
-          await this.handleMeetingEnded(autonomyLevel);
-        } else {
-          this.deps.display.showMessage(`No active meeting`, {
-            duration: 2000,
-          });
-        }
-        break;
-
       case "generate_notes":
-        if (this.deps.meeting.isInMeeting()) {
-          // End meeting first, then generate notes
-          this.deps.display.showMessage(`📝 Generating notes...`, {
-            duration: 2000,
-          });
-          await this.handleMeetingEnded(autonomyLevel);
-        } else {
-          // Try to generate notes for last meeting
-          const recentMeetings = this.deps.meeting.getRecentMeetings();
-          if (recentMeetings.length > 0 && this.deps.notes) {
-            const lastMeeting = recentMeetings[0];
-            this.deps.display.showMessage(`📝 Generating notes...`, {
-              duration: 2000,
-            });
-            this.setState("processing");
-            try {
-              await this.deps.notes.generateNotes(lastMeeting._id!);
-            } catch (error) {
-              this.deps.logger.error(
-                "[AgentManager] Note generation failed:",
-                error,
-              );
-            }
-            this.setState("idle");
-          } else {
-            this.deps.display.showMessage(`No meeting to generate notes for`, {
-              duration: 2000,
-            });
-          }
-        }
+        await this.handleGenerateNotesCommand(autonomyLevel);
         break;
 
       default:
@@ -812,6 +771,123 @@ export class AgentManager {
           `[AgentManager] Unknown command type: ${command.type}`,
         );
     }
+  }
+
+  /**
+   * Handle generate notes command - works with or without active meeting
+   * If no active meeting, creates one from recent transcripts
+   */
+  private async handleGenerateNotesCommand(
+    autonomyLevel: string,
+  ): Promise<void> {
+    this.deps.display.showMessage(`📝 Analyzing transcripts...`, {
+      duration: 3000,
+    });
+
+    // If there's an active meeting, end it and generate notes
+    if (this.deps.meeting.isInMeeting()) {
+      this.deps.logger.info(
+        "[AgentManager] Ending active meeting and generating notes",
+      );
+      await this.handleMeetingEnded(autonomyLevel);
+      return;
+    }
+
+    // No active meeting - create one from recent transcripts (last 2 hours)
+    this.deps.logger.info(
+      "[AgentManager] No active meeting - creating from recent transcripts",
+    );
+
+    // Get recent transcript text (last 100 segments or ~2 hours worth)
+    const recentText = this.deps.transcript.getRecentText(100, true);
+
+    if (!recentText || recentText.length < 50) {
+      this.deps.display.showMessage(
+        `Not enough transcript\nto generate notes`,
+        {
+          duration: 3000,
+        },
+      );
+      return;
+    }
+
+    this.setState("processing");
+
+    try {
+      // Analyze transcript to get meeting classification
+      let classification = {
+        category: "unknown" as MeetingCategory,
+        title: "Meeting Notes",
+        confidence: 0.8,
+        attendees: [] as string[],
+      };
+
+      // Try to get better classification from LLM
+      if (this.provider) {
+        try {
+          const analysisResult = await this.analyzeTranscript(recentText);
+          if (analysisResult.classification) {
+            classification = {
+              category: analysisResult.classification
+                .category as MeetingCategory,
+              title: analysisResult.classification.title,
+              confidence: analysisResult.classification.confidence,
+              attendees: analysisResult.classification.attendees,
+            };
+          }
+        } catch (err) {
+          this.deps.logger.warn(
+            "[AgentManager] Classification failed, using defaults",
+          );
+        }
+      }
+
+      this.deps.display.showMessage(
+        `📋 ${classification.title}\nGenerating notes...`,
+        {
+          duration: 3000,
+        },
+      );
+
+      // Create a meeting record for the transcript
+      await this.deps.meeting.startMeeting({
+        title: classification.title,
+        category: classification.category,
+        confidence: classification.confidence,
+        attendees: classification.attendees,
+      });
+
+      // Immediately end it to trigger note generation
+      const meeting = await this.deps.meeting.endMeeting();
+
+      if (meeting && this.deps.notes && autonomyLevel !== "capture_only") {
+        this.deps.display.showDashboardGeneratingNotes();
+        try {
+          await this.deps.notes.generateNotes(meeting._id!);
+          this.deps.display.showMessage(`✅ Notes created!\nCheck your inbox`, {
+            duration: 4000,
+          });
+        } catch (error) {
+          this.deps.logger.error(
+            "[AgentManager] Note generation failed:",
+            error,
+          );
+          this.deps.display.showMessage(`❌ Note generation\nfailed`, {
+            duration: 3000,
+          });
+        }
+      }
+    } catch (error) {
+      this.deps.logger.error(
+        "[AgentManager] Generate notes command failed:",
+        error,
+      );
+      this.deps.display.showMessage(`❌ Failed to\ngenerate notes`, {
+        duration: 3000,
+      });
+    }
+
+    this.setState("idle");
   }
 
   // ===========================================================================
