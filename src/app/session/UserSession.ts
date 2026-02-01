@@ -159,10 +159,11 @@ export class UserSession {
     // BroadcastManager is standalone
     this.broadcast = new BroadcastManager(userId);
 
-    // DisplayManager needs logger and appSession
+    // DisplayManager needs logger, appSession, and broadcast
     this.display = new DisplayManager({
       logger: this.logger,
       appSession: this._appSession,
+      broadcast: this.broadcast,
     });
 
     // TranscriptManager needs userId, logger, and broadcast
@@ -338,6 +339,9 @@ export class UserSession {
   /**
    * Handle incoming transcription from glasses
    * This is the main entry point for transcript data
+   *
+   * Enhanced: Now uses processAndDisplayTranscript for proper streaming
+   * with interim updates, speaker diarization, and smooth display.
    */
   onTranscription(text: string, isFinal: boolean, speakerId?: string): void {
     if (this.disposed) return;
@@ -345,12 +349,11 @@ export class UserSession {
     // Add to transcript buffer
     const segment = this.transcript.addSegment(text, isFinal, speakerId);
 
-    // Show on glasses (if enabled)
-    if (isFinal && this.display.isTranscriptEnabled()) {
-      this.display.showTranscript(text);
-    }
+    // Show on glasses with enhanced streaming display
+    // This handles both interim and final transcripts properly
+    this.display.processAndDisplayTranscript(text, isFinal, speakerId);
 
-    // Notify AgentManager for analysis
+    // Notify AgentManager for analysis (only on final)
     if (isFinal) {
       this.agent.onNewTranscript(segment);
     }
