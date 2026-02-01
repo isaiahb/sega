@@ -220,19 +220,16 @@ api.get("/transcript/today", async (c: Context) => {
   const { userId, session } = getSessionOrUserId(c);
   const todayDate = new Date().toISOString().split("T")[0];
 
-  // If session exists and has segments, get from memory
+  // If session exists, get from memory
   if (session) {
     const segments = session.transcript.getRecentSegments(undefined, true);
-    if (segments.length > 0) {
-      return c.json({
-        date: session.transcript.getCurrentDate(),
-        segments,
-      });
-    }
-    // Session exists but no segments in memory - fall through to DB
+    return c.json({
+      date: session.transcript.getCurrentDate(),
+      segments,
+    });
   }
 
-  // No active session or session has no segments - query database
+  // No active session - query database for most recent transcript (ignore date for demo)
   try {
     // First try today's date
     let transcript = await DailyTranscriptModel.findOne({

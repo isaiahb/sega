@@ -54,8 +54,8 @@ export const NotesView: React.FC = () => {
       // Fetch today's transcript
       const { data: transcriptData } = await fetchWithFallback(
         async () => {
-          const segments = await api.getTranscriptToday();
-          return { date: new Date().toISOString().split("T")[0], segments };
+          const resp = await api.getTodayTranscript();
+          return resp;
         },
         { date: "", segments: [] },
         "Failed to load transcript",
@@ -97,14 +97,10 @@ export const NotesView: React.FC = () => {
 
         // Don't add empty days - only show days with actual data
 
-        // Sort dates - most recent first
-        const sortedDates = Array.from(allDates).sort(
-          (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-        );
-
         // Transform to DailyFolder format
-        const transformedFolders: DailyFolder[] = sortedDates.map(
-          (date, idx) => {
+        const transformedFolders: DailyFolder[] = Array.from(allDates)
+          .sort((a, b) => new Date(b).getTime() - new Date(a).getTime()) // Most recent first
+          .map((date, idx) => {
             const notes = notesByDate.get(date) || [];
             const meetings = meetingsByDate.get(date) || [];
             const dateObj = new Date(date);
@@ -158,21 +154,22 @@ export const NotesView: React.FC = () => {
               }
             });
 
-            // Transform transcript segments for first folder (most recent)
-            const folderTranscriptions: TranscriptionSegment[] =
-              idx === 0
-                ? (transcriptData.segments || []).map((seg: any) => ({
-                    id: `seg-${seg.index}`,
-                    time: seg.timestamp
-                      ? new Date(seg.timestamp).toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "",
-                    text: seg.text,
-                    speaker: seg.speakerHint,
-                  }))
-                : [];
+            // Transform transcript segments for this folder (only for today)
+            const folderTranscriptions: TranscriptionSegment[] = isToday(
+              dateObj,
+            )
+              ? (transcriptData.segments || []).map((seg: any) => ({
+                  id: `seg-${seg.index}`,
+                  time: seg.timestamp
+                    ? new Date(seg.timestamp).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "",
+                  text: seg.text,
+                  speaker: seg.speakerHint,
+                }))
+              : [];
 
             return {
               id: `folder-${date}`,
@@ -185,8 +182,7 @@ export const NotesView: React.FC = () => {
               notes: transformedNotes,
               audio: [],
             };
-          },
-        );
+          });
 
         setFolders(transformedFolders);
 
