@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bot,
   Shield,
@@ -10,19 +10,87 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { api, type UserSettings, type MeetingPreset } from '../api/client';
+import { fetchWithFallback } from '../lib/devMode';
+import { SkeletonLoader, ErrorState } from '../components/shared';
 
 type AgentSection = 'autonomy' | 'classification' | 'sensitive';
 
 export const AgentsView: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AgentSection>('autonomy');
-  const [autonomyLevel, setAutonomyLevel] = useState<'capture' | 'suggest' | 'act'>('suggest');
+  const [autonomyLevel, setAutonomyLevel] = useState<'capture_only' | 'suggest' | 'act_with_constraints'>('suggest');
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [presets, setPresets] = useState<MeetingPreset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(true);
+
+  // Load settings from backend
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: realSettings, isMock: isMockSettings } = await fetchWithFallback(
+        () => api.getSettings(),
+        null,
+        'Failed to load settings'
+      );
+
+      const { data: realPresets, isMock: isMockPresets } = await fetchWithFallback(
+        () => api.getPresets(),
+        [],
+        'Failed to load presets'
+      );
+
+      setUsingMockData(isMockSettings || isMockPresets);
+
+      if (realSettings) {
+        setSettings(realSettings);
+        setAutonomyLevel(realSettings.autonomyLevel);
+      }
+
+      if (realPresets && realPresets.length > 0) {
+        setPresets(realPresets);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      setUsingMockData(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSettings = async (newSettings: Partial<UserSettings>) => {
+    try {
+      const updated = await api.updateSettings(newSettings);
+      setSettings(updated);
+      setAutonomyLevel(updated.autonomyLevel);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    }
+  };
 
   const renderContent = () => {
+      if (loading) return <SkeletonLoader variant="card" count={3} />;
+      if (error && !usingMockData) return <ErrorState message={error} onRetry={loadSettings} />;
+
       switch(activeSection) {
-          case 'autonomy': return <AutonomySettings level={autonomyLevel} setLevel={setAutonomyLevel} />;
-          case 'classification': return <ClassificationSettings />;
+          case 'autonomy': return <AutonomySettings level={autonomyLevel} setLevel={(l) => {
+            setAutonomyLevel(l as 'capture_only' | 'suggest' | 'act_with_constraints');
+            saveSettings({ autonomyLevel: l as 'capture_only' | 'suggest' | 'act_with_constraints' });
+          }} />;
+          case 'classification': return <ClassificationSettings presets={presets} />;
           case 'sensitive': return <SensitiveTopicsSettings />;
-          default: return <AutonomySettings level={autonomyLevel} setLevel={setAutonomyLevel} />;
+          default: return <AutonomySettings level={autonomyLevel} setLevel={(l) => {
+            setAutonomyLevel(l as 'capture_only' | 'suggest' | 'act_with_constraints');
+            saveSettings({ autonomyLevel: l as 'capture_only' | 'suggest' | 'act_with_constraints' });
+          }} />;
       }
   };
 
@@ -80,7 +148,7 @@ const NavButton = ({ icon: Icon, label, active, onClick }: { icon: React.Element
     </button>
 );
 
-const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'capture' | 'suggest' | 'act') => void }) => (
+const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'capture_only' | 'suggest' | 'act_with_constraints') => void }) => (
     <>
         <div className="mb-8">
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Autonomy Settings</h1>
@@ -92,8 +160,8 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
             <AutonomyCard
                 title="Capture Only"
                 description="Records and summarizes. No outgoing actions."
-                active={level === 'capture'}
-                onClick={() => setLevel('capture')}
+                active={level === 'capture_only'}
+                onClick={() => setLevel('capture_only')}
                 icon={Bot}
             />
             <AutonomyCard
@@ -106,8 +174,8 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
             <AutonomyCard
                 title="Act with Constraints"
                 description="Sends internal summaries automatically. Asks for external."
-                active={level === 'act'}
-                onClick={() => setLevel('act')}
+                active={level === 'act_with_constraints'}
+                onClick={() => setLevel('act_with_constraints')}
                 icon={Check}
             />
         </div>
@@ -138,16 +206,16 @@ const AutonomySettings = ({ level, setLevel }: { level: string, setLevel: (l: 'c
     </>
 );
 
-const ClassificationSettings = () => {
-  const [rules, setRules] = useState([
-      { name: "Standups", condition: "Title contains 'Standup' or 'Daily'", category: "Standup", active: true },
-      { name: "External Sales", condition: "Attendees include external domains", category: "External Call", active: true },
-      { name: "1:1s", condition: "Exactly 2 attendees", category: "Personnel", active: true },
-      { name: "Design Reviews", condition: "Title contains 'Design' or 'UX'", category: "Design Review", active: false }
+const ClassificationSettings = ({ presets = [] }: { presets?: MeetingPreset[] }) => {
+  const [rules, setRules] = useState(presets.length > 0 ? presets : [
+      { id: '1', userId: '', name: "Standups", condition: "Title contains 'Standup' or 'Daily'", category: "Standup", isActive: true, userContext: '', noteRules: { detailLevel: 'minimal', captureDecisions: false, captureActionItems: true }, researchTriggers: { autoResearchAttendees: false, autoResearchCompanies: false, autoResearchTopics: false } },
+      { id: '2', userId: '', name: "External Sales", condition: "Attendees include external domains", category: "External Call", isActive: true, userContext: '', noteRules: { detailLevel: 'detailed', captureDecisions: true, captureActionItems: true }, researchTriggers: { autoResearchAttendees: true, autoResearchCompanies: true, autoResearchTopics: false } },
+      { id: '3', userId: '', name: "1:1s", condition: "Exactly 2 attendees", category: "Personnel", isActive: true, userContext: '', noteRules: { detailLevel: 'standard', captureDecisions: true, captureActionItems: true }, researchTriggers: { autoResearchAttendees: false, autoResearchCompanies: false, autoResearchTopics: false } },
+      { id: '4', userId: '', name: "Design Reviews", condition: "Title contains 'Design' or 'UX'", category: "Design Review", isActive: false, userContext: '', noteRules: { detailLevel: 'detailed', captureDecisions: true, captureActionItems: true }, researchTriggers: { autoResearchAttendees: false, autoResearchCompanies: false, autoResearchTopics: true } }
   ]);
 
   const toggleRule = (index: number) => {
-    setRules(rules.map((r, i) => i === index ? { ...r, active: !r.active } : r));
+    setRules(rules.map((r, i) => i === index ? { ...r, isActive: !r.isActive } : r));
   };
 
   return (
@@ -181,10 +249,10 @@ const ClassificationSettings = () => {
                                     onClick={() => toggleRule(i)}
                                     className={clsx(
                                         "inline-flex w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors",
-                                        rule.active ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
+                                        rule.isActive ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
                                     )}
                                  >
-                                     <div className={clsx("w-3 h-3 bg-white rounded-full shadow-sm transition-transform", rule.active ? "translate-x-4" : "translate-x-0")} />
+                                     <div className={clsx("w-3 h-3 bg-white rounded-full shadow-sm transition-transform", rule.isActive ? "translate-x-4" : "translate-x-0")} />
                                  </button>
                              </td>
                          </tr>
