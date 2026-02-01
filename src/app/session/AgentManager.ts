@@ -471,6 +471,17 @@ export class AgentManager {
       return { type: "generate_notes", content: "" };
     }
 
+    // Send meeting notes command (demo flow)
+    if (
+      lower.includes("send me the meeting notes") ||
+      lower.includes("send me meeting notes") ||
+      lower.includes("send meeting notes") ||
+      lower.includes("email me the notes") ||
+      lower.includes("email the notes")
+    ) {
+      return { type: "send_meeting_notes", content: "" };
+    }
+
     // Research commands - extract the query
     const researchMatch = lower.match(
       /(?:sega|seka)[,.]?\s*(?:research|look up|find|search)\s+(.+)/i,
@@ -777,11 +788,144 @@ export class AgentManager {
         await this.handleGenerateNotesCommand(autonomyLevel);
         break;
 
+      case "send_meeting_notes":
+        await this.handleSendMeetingNotesDemo();
+        break;
+
       default:
         this.deps.logger.warn(
           `[AgentManager] Unknown command type: ${command.type}`,
         );
     }
+  }
+
+  /**
+   * Demo flow for "send me the meeting notes" command
+   * Shows mock deep research progress on glasses and broadcasts to UI
+   */
+  private async handleSendMeetingNotesDemo(): Promise<void> {
+    this.deps.logger.info(
+      "[AgentManager] Starting send meeting notes demo flow",
+    );
+    this.setState("researching");
+
+    // Step 1: Acknowledge command
+    this.deps.display.showMessage(`📋 Got it!\nGathering meeting notes...`, {
+      duration: 2000,
+    });
+    this.deps.broadcast.broadcast({
+      type: "research_started",
+      query: "Meeting notes compilation",
+      queryType: "meeting_notes",
+    });
+    await this.sleep(2000);
+
+    // Step 2: Show searching animation
+    this.deps.display.showMessage(
+      `🔍 Analyzing transcript...\nIdentifying key points`,
+      {
+        duration: 2500,
+      },
+    );
+    this.deps.broadcast.broadcast({
+      type: "research_progress",
+      message: "Analyzing meeting transcript...",
+      progress: 20,
+    });
+    await this.sleep(2500);
+
+    // Step 3: Processing
+    this.deps.display.showMessage(
+      `📊 Found 12 key topics\nExtracting action items...`,
+      {
+        duration: 2500,
+      },
+    );
+    this.deps.broadcast.broadcast({
+      type: "research_progress",
+      message: "Extracting action items and decisions...",
+      progress: 45,
+    });
+    await this.sleep(2500);
+
+    // Step 4: Generating summary
+    this.deps.display.showMessage(
+      `✍️ Generating summary\n3 action items found`,
+      {
+        duration: 2500,
+      },
+    );
+    this.deps.broadcast.broadcast({
+      type: "research_progress",
+      message: "Generating executive summary...",
+      progress: 70,
+    });
+    await this.sleep(2500);
+
+    // Step 5: Preparing email
+    this.deps.display.showMessage(`📧 Preparing email...\nFormatting notes`, {
+      duration: 2000,
+    });
+    this.deps.broadcast.broadcast({
+      type: "research_progress",
+      message: "Formatting notes for delivery...",
+      progress: 90,
+    });
+    await this.sleep(2000);
+
+    // Step 6: Complete
+    this.deps.display.showMessage(`✅ Notes ready!\nSending to your email...`, {
+      duration: 3000,
+    });
+
+    // Send research complete with mock results
+    this.deps.broadcast.broadcast({
+      type: "research_complete",
+      success: true,
+      summary: "Meeting notes compiled successfully",
+      results: [
+        {
+          title: "Q1 Planning Meeting Notes",
+          url: "internal://notes",
+          snippet:
+            "Key decisions: Approved Q2 budget, Set launch date for June 15th, Assigned project leads",
+        },
+      ],
+    });
+
+    // Also send notes_ready event
+    this.deps.broadcast.broadcast({
+      type: "notes_ready",
+      noteId: "demo-note-" + Date.now(),
+      meetingId: "demo-meeting",
+      title: "Meeting Notes",
+      summary: "Meeting notes have been compiled and sent to your email.",
+      actionItems: [
+        { task: "Review Q2 budget proposal", priority: "high", owner: "Team" },
+        {
+          task: "Prepare launch timeline",
+          priority: "medium",
+          owner: "Product",
+        },
+        { task: "Schedule follow-up sync", priority: "low", owner: "You" },
+      ],
+    });
+
+    await this.sleep(1500);
+
+    // Final confirmation
+    this.deps.display.showMessage(`📬 Done!\nNotes sent to your inbox`, {
+      duration: 3000,
+    });
+
+    this.setState(this.deps.meeting.isInMeeting() ? "in_meeting" : "idle");
+  }
+
+  /**
+   * Helper to sleep for demo animations
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
