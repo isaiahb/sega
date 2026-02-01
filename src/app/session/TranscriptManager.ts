@@ -11,6 +11,13 @@
  */
 
 import type { TranscriptSegment, DailyTranscript } from "./types";
+import {
+  appendTranscriptSegments,
+  getOrCreateDailyTranscript,
+  DailyTranscript as DailyTranscriptModel,
+  isDBConnected,
+  type ITranscriptSegment,
+} from "../../services/db";
 
 /**
  * Interface for the parts of UserSession that TranscriptManager needs
@@ -231,19 +238,23 @@ export class TranscriptManager {
     );
 
     try {
-      // TODO: Implement MongoDB persistence
-      // For now, just log and mark as flushed
-      //
-      // const db = await getDatabase();
-      // await db.collection('daily_transcripts').updateOne(
-      //   { userId: this.userSession.userId, date: this.currentDate },
-      //   {
-      //     $push: { segments: { $each: finalSegments } },
-      //     $setOnInsert: { createdAt: new Date() },
-      //     $set: { updatedAt: new Date() }
-      //   },
-      //   { upsert: true }
-      // );
+      // Persist to MongoDB if connected
+      if (isDBConnected()) {
+        const dbSegments: ITranscriptSegment[] = finalSegments.map((s) => ({
+          text: s.text,
+          timestamp: s.timestamp,
+          isFinal: s.isFinal,
+          speakerId: s.speakerHint,
+          index: s.index ?? 0,
+          meetingId: s.meetingId,
+        }));
+
+        await appendTranscriptSegments(
+          this.deps.userId,
+          this.currentDate,
+          dbSegments,
+        );
+      }
 
       // Clear flushed segments from buffer (keep interim ones)
       this.buffer = this.buffer.filter((s) => !s.isFinal);
@@ -281,14 +292,56 @@ export class TranscriptManager {
   async getDailyTranscript(date?: string): Promise<DailyTranscript | null> {
     const targetDate = date || this.currentDate;
 
-    // TODO: Implement MongoDB retrieval
-    // const db = await getDatabase();
-    // return db.collection('daily_transcripts').findOne({
-    //   userId: this.userSession.userId,
-    //   date: targetDate
-    // });
+    // Try to get from MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        const dbTranscript = await DailyTranscriptModel.findOne({
+          userId: this.deps.userId,
+          date: targetDate,
+        });
 
-    // For now, return buffer as a mock daily transcript
+        if (dbTranscript) {
+          // Convert DB segments to our type
+          const segments: TranscriptSegment[] = dbTranscript.segments.map(
+            (s) => ({
+              text: s.text,
+              timestamp: s.timestamp,
+              isFinal: s.isFinal,
+              speakerHint: s.speakerId,
+              index: s.index,
+              meetingId: s.meetingId,
+            }),
+          );
+
+          // If it's today, merge with buffer
+          if (targetDate === this.currentDate) {
+            const bufferFinal = this.buffer.filter((s) => s.isFinal);
+            return {
+              userId: this.deps.userId,
+              date: targetDate,
+              segments: [...segments, ...bufferFinal],
+              createdAt: dbTranscript.createdAt,
+              updatedAt: dbTranscript.updatedAt,
+            };
+          }
+
+          return {
+            userId: this.deps.userId,
+            date: targetDate,
+            segments,
+            createdAt: dbTranscript.createdAt,
+            updatedAt: dbTranscript.updatedAt,
+          };
+        }
+      } catch (error) {
+        this.deps.logger.error(
+          "[TranscriptManager] Failed to get transcript from DB:",
+          error,
+        );
+      }
+    }
+
+    // Fallback: return buffer as a mock daily transcript (for today only)
     if (targetDate === this.currentDate) {
       return {
         userId: this.deps.userId,
