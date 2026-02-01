@@ -10,6 +10,49 @@ This branch contains the complete backend rewrite using a manager-based architec
 
 ---
 
+## 2025-02-01 - Phase 4: Persistence & Frontend API
+
+### Added
+- **MongoDB Service** (`src/services/db/index.ts`)
+  - Mongoose connection management (connect/disconnect)
+  - Models for all data types:
+    - `DailyTranscript` - Daily transcript storage with segments
+    - `Meeting` - Meeting records with transcript ranges
+    - `Note` - Meeting notes with key points and decisions
+    - `ActionItem` - Action items with priority and status
+    - `ResearchResult` - Research results with sources
+    - `UserSettings` - User preferences
+    - `MeetingPreset` - Meeting detection presets
+    - `SensitiveTopic` - Privacy keywords
+  - Helper functions for common queries
+  - Proper indexes for efficient queries
+
+- **Complete API Endpoints** (`src/api/router.ts`)
+  - **Transcript**: `/today`, `/:date`, `/:date/range`
+  - **Meetings**: list with filters, get by ID, end, process
+  - **Notes**: CRUD, generate-summary, email
+  - **Actions**: CRUD with status/priority filters
+  - **Research**: start, status, by meeting, email
+  - **Settings**: GET, PUT, PATCH
+  - **Presets**: CRUD
+  - **Sensitive Topics**: list, add, remove
+  - **State**: get, recording start/stop, glasses transcript toggle
+
+### Changed
+- **TranscriptManager**: Now persists segments to MongoDB via `appendTranscriptSegments()`
+- **MeetingManager**: Full MongoDB persistence for all meeting operations
+  - Create, end, cancel meetings
+  - Update classification, topics, attendees
+  - Link notes, action items, research
+- **SettingsManager**: Added `removePreset()` and `removeSensitiveTopic()` methods
+- **SegaApp**: Connects to MongoDB on startup, graceful shutdown
+
+### Notes
+- App works without MongoDB (in-memory fallback)
+- Frontend API client (`src/webview/api/client.ts`) is now fully compatible
+
+---
+
 ## 2026-01-31 - Phase 3: Research
 
 ### Added
@@ -242,6 +285,9 @@ This branch contains the complete backend rewrite using a manager-based architec
 | `531c621` | Phase 1 | Foundation - New manager architecture |
 | `532bf17` | Phase 2 | Intelligence - AgentManager and NotesManager |
 | `4c96ded` | Phase 3 | Research - ResearchManager with Firecrawl |
+| `44f24fc` | Docs | Add comprehensive CHANGELOG.md |
+| `f267d59` | Phase 4 | Add MongoDB service with mongoose models |
+| `483ec92` | Phase 4 | Add MongoDB persistence and complete API endpoints |
 
 ---
 
@@ -295,14 +341,14 @@ bun run src/cli/test-research.ts --url "https://example.com"
 
 ## Remaining Work
 
-### Phase 4: Persistence
-- [ ] MongoDB connection setup
-- [ ] Mongoose models for all types
-- [ ] Persist DailyTranscripts
-- [ ] Persist Meetings
-- [ ] Persist Notes and ActionItems
-- [ ] Persist Research results
-- [ ] Persist User settings
+### Phase 4: Persistence ✅ COMPLETE
+- [x] MongoDB connection setup
+- [x] Mongoose models for all types
+- [x] Persist DailyTranscripts
+- [x] Persist Meetings
+- [x] Persist Notes and ActionItems
+- [x] Persist Research results
+- [x] Persist User settings
 
 ### Phase 5: Polish
 - [ ] Email via Resend (reports, summaries)
@@ -311,3 +357,4 @@ bun run src/cli/test-research.ts --url "https://example.com"
 - [ ] Settings UI integration
 - [ ] Remove old `src/backend/` code
 - [ ] Production deployment config
+- [ ] Test with real glasses end-to-end
