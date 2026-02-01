@@ -24,7 +24,7 @@ export interface EmailManagerDeps {
     error: (message: string, ...args: unknown[]) => void;
   };
   settings: {
-    getSettings: () => { emailSummaries?: boolean; emailAddress?: string };
+    getSettings: () => { emailSummaries?: boolean; email?: string };
   };
   broadcast: {
     broadcast: (data: Record<string, unknown>) => void;
@@ -97,12 +97,12 @@ export class EmailManager {
       } catch (error) {
         this.deps.logger.warn(
           "[EmailManager] Failed to initialize Resend:",
-          error
+          error,
         );
       }
     } else {
       this.deps.logger.warn(
-        "[EmailManager] No RESEND_API_KEY - email disabled"
+        "[EmailManager] No RESEND_API_KEY - email disabled",
       );
     }
 
@@ -122,16 +122,20 @@ export class EmailManager {
 
   /**
    * Get the default recipient email
+   * Falls back to userId which is the user's email
    */
-  getDefaultRecipient(): string | undefined {
-    return this.deps.settings.getSettings().emailAddress;
+  getDefaultRecipient(): string {
+    const settings = this.deps.settings.getSettings();
+    return settings.email || this.deps.userId;
   }
 
   /**
    * Check if user has email summaries enabled
+   * Defaults to true for demo
    */
   isEmailSummariesEnabled(): boolean {
-    return this.deps.settings.getSettings().emailSummaries === true;
+    const settings = this.deps.settings.getSettings();
+    return settings.emailSummaries !== false; // Default to true
   }
 
   // ===========================================================================
@@ -145,20 +149,20 @@ export class EmailManager {
     meeting: Meeting,
     note: Note,
     actionItems: ActionItem[],
-    options?: EmailOptions
+    options?: EmailOptions,
   ): Promise<EmailResult> {
     if (!this.emailAvailable || !this.resend) {
       return { success: false, error: "Email not available" };
     }
 
     const recipient = options?.to || this.getDefaultRecipient();
-    if (!recipient) {
-      return { success: false, error: "No recipient email configured" };
-    }
+
+    this.deps.logger.info(
+      `[EmailManager] Sending meeting summary to: ${recipient}`,
+    );
 
     try {
-      const subject =
-        options?.subject || `Meeting Summary: ${meeting.title}`;
+      const subject = options?.subject || `Meeting Summary: ${meeting.title}`;
       const html = this.renderMeetingSummaryEmail(meeting, note, actionItems);
 
       const result = await this.resend.emails.send({
@@ -174,13 +178,13 @@ export class EmailManager {
       if (result.error) {
         this.deps.logger.error(
           "[EmailManager] Failed to send meeting summary:",
-          result.error
+          result.error,
         );
         return { success: false, error: result.error.message };
       }
 
       this.deps.logger.info(
-        `[EmailManager] Meeting summary sent: ${result.data?.id}`
+        `[EmailManager] Meeting summary sent: ${result.data?.id}`,
       );
 
       // Broadcast email sent event
@@ -195,7 +199,7 @@ export class EmailManager {
     } catch (error) {
       this.deps.logger.error(
         "[EmailManager] Error sending meeting summary:",
-        error
+        error,
       );
       return {
         success: false,
@@ -210,11 +214,11 @@ export class EmailManager {
   private renderMeetingSummaryEmail(
     meeting: Meeting,
     note: Note,
-    actionItems: ActionItem[]
+    actionItems: ActionItem[],
   ): string {
     const duration = meeting.endTime
       ? this.formatDuration(
-          meeting.endTime.getTime() - meeting.startTime.getTime()
+          meeting.endTime.getTime() - meeting.startTime.getTime(),
         )
       : "In progress";
 
@@ -232,7 +236,7 @@ export class EmailManager {
             ${item.dueDate ? `<br><span style="color: #666;">Due: ${new Date(item.dueDate).toLocaleDateString()}</span>` : ""}
             <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px; background: ${this.getPriorityColor(item.priority)}; color: white;">${item.priority}</span>
           </li>
-        `
+        `,
           )
           .join("")}
       </ul>
@@ -288,12 +292,16 @@ export class EmailManager {
       </div>
     </div>
 
-    ${meeting.attendees && meeting.attendees.length > 0 ? `
+    ${
+      meeting.attendees && meeting.attendees.length > 0
+        ? `
     <div style="margin-bottom: 24px;">
       <span style="color: #666; font-size: 12px; text-transform: uppercase;">Attendees</span>
       <div style="font-weight: 500;">${meeting.attendees.map((a) => this.escapeHtml(a)).join(", ")}</div>
     </div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <h3 style="color: #1a1a1a; margin-top: 0;">Summary</h3>
     <p style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
@@ -328,7 +336,7 @@ export class EmailManager {
     meetings: Meeting[],
     notes: Note[],
     pendingActions: ActionItem[],
-    options?: EmailOptions
+    options?: EmailOptions,
   ): Promise<EmailResult> {
     if (!this.emailAvailable || !this.resend) {
       return { success: false, error: "Email not available" };
@@ -340,13 +348,12 @@ export class EmailManager {
     }
 
     try {
-      const subject =
-        options?.subject || `SEGA Daily Digest - ${date}`;
+      const subject = options?.subject || `SEGA Daily Digest - ${date}`;
       const html = this.renderDailyDigestEmail(
         date,
         meetings,
         notes,
-        pendingActions
+        pendingActions,
       );
 
       const result = await this.resend.emails.send({
@@ -359,20 +366,20 @@ export class EmailManager {
       if (result.error) {
         this.deps.logger.error(
           "[EmailManager] Failed to send daily digest:",
-          result.error
+          result.error,
         );
         return { success: false, error: result.error.message };
       }
 
       this.deps.logger.info(
-        `[EmailManager] Daily digest sent: ${result.data?.id}`
+        `[EmailManager] Daily digest sent: ${result.data?.id}`,
       );
 
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       this.deps.logger.error(
         "[EmailManager] Error sending daily digest:",
-        error
+        error,
       );
       return {
         success: false,
@@ -388,7 +395,7 @@ export class EmailManager {
     date: string,
     meetings: Meeting[],
     notes: Note[],
-    pendingActions: ActionItem[]
+    pendingActions: ActionItem[],
   ): string {
     const meetingsHtml =
       meetings.length > 0
@@ -403,7 +410,7 @@ export class EmailManager {
             ${new Date(m.startTime).toLocaleTimeString()} • ${this.formatCategory(m.category)}
           </div>
         </div>
-      `
+      `,
         )
         .join("")}
     `
@@ -422,7 +429,7 @@ export class EmailManager {
             ${this.escapeHtml(item.description)}
             ${item.dueDate ? `<span style="color: #666;"> (Due: ${new Date(item.dueDate).toLocaleDateString()})</span>` : ""}
           </li>
-        `
+        `,
           )
           .join("")}
       </ul>
@@ -467,7 +474,7 @@ export class EmailManager {
    */
   async sendResearchResults(
     research: ResearchResult,
-    options?: EmailOptions
+    options?: EmailOptions,
   ): Promise<EmailResult> {
     if (!this.emailAvailable || !this.resend) {
       return { success: false, error: "Email not available" };
@@ -479,8 +486,7 @@ export class EmailManager {
     }
 
     try {
-      const subject =
-        options?.subject || `Research Results: ${research.query}`;
+      const subject = options?.subject || `Research Results: ${research.query}`;
       const html = this.renderResearchEmail(research);
 
       const result = await this.resend.emails.send({
@@ -493,20 +499,20 @@ export class EmailManager {
       if (result.error) {
         this.deps.logger.error(
           "[EmailManager] Failed to send research results:",
-          result.error
+          result.error,
         );
         return { success: false, error: result.error.message };
       }
 
       this.deps.logger.info(
-        `[EmailManager] Research results sent: ${result.data?.id}`
+        `[EmailManager] Research results sent: ${result.data?.id}`,
       );
 
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       this.deps.logger.error(
         "[EmailManager] Error sending research results:",
-        error
+        error,
       );
       return {
         success: false,
@@ -541,7 +547,7 @@ export class EmailManager {
           <a href="${this.escapeHtml(source.url)}" style="color: #667eea; font-weight: 500;">${this.escapeHtml(source.title)}</a>
           <p style="color: #666; font-size: 14px; margin: 4px 0 0 0;">${this.escapeHtml(source.snippet?.substring(0, 150) || "")}...</p>
         </div>
-      `
+      `,
         )
         .join("")}
     `
@@ -595,7 +601,7 @@ export class EmailManager {
     to: string,
     subject: string,
     html: string,
-    options?: Omit<EmailOptions, "to" | "subject">
+    options?: Omit<EmailOptions, "to" | "subject">,
   ): Promise<EmailResult> {
     if (!this.emailAvailable || !this.resend) {
       return { success: false, error: "Email not available" };
@@ -615,20 +621,20 @@ export class EmailManager {
       if (result.error) {
         this.deps.logger.error(
           "[EmailManager] Failed to send custom email:",
-          result.error
+          result.error,
         );
         return { success: false, error: result.error.message };
       }
 
       this.deps.logger.info(
-        `[EmailManager] Custom email sent: ${result.data?.id}`
+        `[EmailManager] Custom email sent: ${result.data?.id}`,
       );
 
       return { success: true, messageId: result.data?.id };
     } catch (error) {
       this.deps.logger.error(
         "[EmailManager] Error sending custom email:",
-        error
+        error,
       );
       return {
         success: false,

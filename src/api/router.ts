@@ -1964,6 +1964,228 @@ api.get("/settings/sensitive-topics", async (c: Context) => {
 });
 
 // ===========================================================================
+// Demo Endpoints (for testing e2e flow)
+// ===========================================================================
+
+/**
+ * POST /api/demo/start-meeting - Manually start a demo meeting
+ */
+api.post("/demo/start-meeting", async (c: Context) => {
+  const result = getSessionOrUserId(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: "No active glasses session. Connect your glasses first.",
+    });
+  }
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const title = body.title || "Demo Meeting";
+    const category = body.category || "investor_update";
+
+    // Start meeting
+    await session.meeting.startMeeting({
+      title,
+      category,
+      confidence: 0.95,
+      attendees: body.attendees || ["Demo User"],
+    });
+
+    const meeting = session.meeting.getActiveMeeting();
+
+    return c.json({
+      success: true,
+      message: `Meeting started: ${title}`,
+      meeting,
+    });
+  } catch (error) {
+    console.error("[API] Demo start meeting error:", error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+/**
+ * POST /api/demo/end-meeting - End meeting and generate notes
+ */
+api.post("/demo/end-meeting", async (c: Context) => {
+  const result = getSessionOrUserId(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: "No active glasses session",
+    });
+  }
+
+  if (!session.meeting.isInMeeting()) {
+    return c.json({
+      success: false,
+      error: "No active meeting to end",
+    });
+  }
+
+  try {
+    // End the meeting
+    const meeting = await session.meeting.endMeeting();
+
+    if (!meeting) {
+      return c.json({ success: false, error: "Failed to end meeting" }, 500);
+    }
+
+    // Generate notes (this also triggers email automatically)
+    const note = await session.notes.generateNotes(meeting._id!);
+
+    // Get action items
+    const actionItems = await session.notes.getActionItemsForMeeting(
+      meeting._id!,
+    );
+
+    return c.json({
+      success: true,
+      message: "Meeting ended, notes generated",
+      meeting,
+      note: note
+        ? {
+            id: note._id,
+            title: note.title,
+            summary: note.summary,
+            keyPoints: note.keyPoints,
+            decisions: note.decisions,
+          }
+        : null,
+      actionItems: actionItems.map((ai) => ({
+        id: ai._id,
+        description: ai.description,
+        assignee: ai.assignee,
+        priority: ai.priority,
+      })),
+      emailSent: session.email.isAvailable(),
+    });
+  } catch (error) {
+    console.error("[API] Demo end meeting error:", error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+/**
+ * POST /api/demo/add-transcript - Add transcript text for testing
+ */
+api.post("/demo/add-transcript", async (c: Context) => {
+  const result = getSessionOrUserId(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: "No active glasses session",
+    });
+  }
+
+  try {
+    const body = await c.req.json();
+    const text = body.text || "This is a test transcript segment.";
+
+    // Add to transcript
+    session.onTranscription({
+      text,
+      isFinal: body.isFinal !== false,
+      timestamp: Date.now(),
+      speakerHint: body.speaker,
+    });
+
+    return c.json({
+      success: true,
+      message: "Transcript added",
+      text,
+    });
+  } catch (error) {
+    console.error("[API] Demo add transcript error:", error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+/**
+ * POST /api/demo/send-email - Test email sending
+ */
+api.post("/demo/send-email", async (c: Context) => {
+  const result = getSessionOrUserId(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: "No active glasses session",
+    });
+  }
+
+  if (!session.email.isAvailable()) {
+    return c.json({
+      success: false,
+      error: "Email not available. Set RESEND_API_KEY.",
+    });
+  }
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const to = body.to || userId;
+    const subject = body.subject || "SEGA Test Email";
+    const content = body.content || "This is a test email from SEGA.";
+
+    const result = await session.email.sendCustomEmail(
+      to,
+      subject,
+      `<div style="font-family: sans-serif; padding: 20px;">
+        <h1 style="color: #1a1a1a;">SEGA Test Email</h1>
+        <p>${content}</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+        <p style="color: #666; font-size: 12px;">Sent from SEGA Demo</p>
+      </div>`,
+    );
+
+    return c.json({
+      success: result.success,
+      message: result.success ? `Email sent to ${to}` : result.error,
+      messageId: result.messageId,
+    });
+  } catch (error) {
+    console.error("[API] Demo send email error:", error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
+});
+
+/**
+ * GET /api/demo/status - Get demo status
+ */
+api.get("/demo/status", async (c: Context) => {
+  const result = getSessionOrUserId(c);
+  if (result instanceof Response) return result;
+  const { userId, session } = result;
+
+  return c.json({
+    success: true,
+    userId,
+    hasSession: !!session,
+    sessionState: session
+      ? {
+          isInMeeting: session.meeting.isInMeeting(),
+          activeMeeting: session.meeting.getActiveMeeting(),
+          transcriptCount: session.transcript.getCurrentIndex(),
+          emailAvailable: session.email.isAvailable(),
+          emailRecipient: session.email.getDefaultRecipient(),
+        }
+      : null,
+  });
+});
+
+// ===========================================================================
 // 404 Handler
 // ===========================================================================
 
