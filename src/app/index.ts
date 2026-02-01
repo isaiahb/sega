@@ -12,6 +12,7 @@
 
 import { AppServer, AppSession } from "@mentra/sdk";
 import { UserSession } from "./session";
+import { connectDB, disconnectDB } from "../services/db";
 
 export interface SegaAppConfig {
   packageName: string;
@@ -34,6 +35,21 @@ export class SegaApp extends AppServer {
       port: config.port,
       cookieSecret: config.cookieSecret,
     });
+
+    // Connect to MongoDB on startup
+    this.initDatabase();
+  }
+
+  /**
+   * Initialize database connection
+   */
+  private async initDatabase(): Promise<void> {
+    try {
+      await connectDB();
+    } catch (error) {
+      console.error("[SegaApp] Failed to connect to database:", error);
+      // Continue without DB - app will work with in-memory storage
+    }
   }
 
   /**
@@ -95,6 +111,23 @@ export class SegaApp extends AppServer {
     //
     // To immediately clean up:
     // await UserSession.remove(userId);
+  }
+
+  /**
+   * Graceful shutdown - disconnect from database
+   */
+  async shutdown(): Promise<void> {
+    console.log("[SegaApp] Shutting down...");
+
+    // Clean up all user sessions
+    for (const userId of UserSession.getActiveUserIds()) {
+      await UserSession.remove(userId);
+    }
+
+    // Disconnect from database
+    await disconnectDB();
+
+    console.log("[SegaApp] Shutdown complete");
   }
 
   /**

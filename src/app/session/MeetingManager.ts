@@ -16,6 +16,12 @@ import type {
   MeetingStatus,
   MeetingPreset,
 } from "./types";
+import {
+  Meeting as MeetingModel,
+  isDBConnected,
+  getRecentMeetings as dbGetRecentMeetings,
+  getMeetingsByDate as dbGetMeetingsByDate,
+} from "../../services/db";
 
 /**
  * Interface for the parts of UserSession that MeetingManager needs
@@ -156,9 +162,35 @@ export class MeetingManager {
     // Show on glasses
     this.deps.display.showMeetingStarted(meeting.title, meeting.category);
 
-    // TODO: Persist to MongoDB
-    // const db = await getDatabase();
-    // await db.collection('meetings').insertOne(meeting);
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.create({
+          _id: meeting._id,
+          userId: meeting.userId,
+          date: meeting.transcriptDate,
+          title: meeting.title,
+          category: meeting.category,
+          status: meeting.status,
+          startTime: meeting.startTime,
+          transcriptRange: {
+            startIndex: meeting.transcriptStartIndex,
+            endIndex: meeting.transcriptEndIndex,
+          },
+          attendees: meeting.attendees,
+          topics: meeting.topics,
+          presetId: meeting.presetId,
+          isSensitive: meeting.isSensitive,
+          sensitiveReason: meeting.sensitiveReason,
+          confidence: meeting.classificationConfidence,
+        });
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to persist meeting:",
+          error,
+        );
+      }
+    }
 
     this.deps.logger.info(
       `[MeetingManager] Meeting started: ${meeting.title} (${meeting.category})`,
@@ -204,12 +236,26 @@ export class MeetingManager {
     // Show on glasses
     this.deps.display.showMeetingEnded(durationStr);
 
-    // TODO: Persist to MongoDB
-    // const db = await getDatabase();
-    // await db.collection('meetings').updateOne(
-    //   { _id: meeting._id },
-    //   { $set: { status: 'ended', endTime: now, transcriptEndIndex: meeting.transcriptEndIndex, updatedAt: now } }
-    // );
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: meeting._id },
+          {
+            $set: {
+              status: "ended",
+              endTime: now,
+              "transcriptRange.endIndex": meeting.transcriptEndIndex,
+            },
+          },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to update meeting:",
+          error,
+        );
+      }
+    }
 
     this.deps.logger.info(
       `[MeetingManager] Meeting ended: ${meeting.title} (${durationStr})`,
@@ -232,7 +278,20 @@ export class MeetingManager {
 
     this.activeMeeting = null;
 
-    // TODO: Delete or mark as cancelled in MongoDB
+    // Mark as cancelled in MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: meeting._id },
+          { $set: { status: "cancelled" } },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to cancel meeting:",
+          error,
+        );
+      }
+    }
 
     this.deps.logger.info(
       `[MeetingManager] Meeting cancelled: ${meeting.title}`,
@@ -275,7 +334,28 @@ export class MeetingManager {
       presetId: preset?._id,
     });
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          {
+            $set: {
+              category,
+              confidence,
+              presetId: preset?._id,
+              isSensitive: this.activeMeeting.isSensitive,
+              sensitiveReason: this.activeMeeting.sensitiveReason,
+            },
+          },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to update classification:",
+          error,
+        );
+      }
+    }
 
     this.deps.logger.info(
       `[MeetingManager] Classification updated: ${category} (${(confidence * 100).toFixed(0)}%)`,
@@ -300,7 +380,17 @@ export class MeetingManager {
 
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $addToSet: { topics: { $each: topics } } },
+        );
+      } catch (error) {
+        this.deps.logger.error("[MeetingManager] Failed to add topics:", error);
+      }
+    }
   }
 
   /**
@@ -321,7 +411,20 @@ export class MeetingManager {
 
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $addToSet: { attendees: { $each: attendees } } },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to add attendees:",
+          error,
+        );
+      }
+    }
   }
 
   /**
@@ -336,7 +439,20 @@ export class MeetingManager {
     this.activeMeeting.sensitiveReason = reason;
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $set: { isSensitive: true, sensitiveReason: reason } },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to mark as sensitive:",
+          error,
+        );
+      }
+    }
 
     this.deps.logger.info(
       `[MeetingManager] Meeting marked as sensitive: ${reason}`,
@@ -360,7 +476,17 @@ export class MeetingManager {
     this.activeMeeting.noteId = noteId;
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $set: { noteId } },
+        );
+      } catch (error) {
+        this.deps.logger.error("[MeetingManager] Failed to link note:", error);
+      }
+    }
   }
 
   /**
@@ -374,7 +500,20 @@ export class MeetingManager {
     this.activeMeeting.actionItemIds.push(actionItemId);
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $push: { actionItemIds: actionItemId } },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to link action item:",
+          error,
+        );
+      }
+    }
   }
 
   /**
@@ -388,7 +527,20 @@ export class MeetingManager {
     this.activeMeeting.researchIds.push(researchId);
     this.activeMeeting.updatedAt = new Date();
 
-    // TODO: Persist to MongoDB
+    // Persist to MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        await MeetingModel.updateOne(
+          { _id: this.activeMeeting._id },
+          { $push: { researchIds: researchId } },
+        );
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to link research:",
+          error,
+        );
+      }
+    }
   }
 
   // ===========================================================================
@@ -427,9 +579,23 @@ export class MeetingManager {
       return { ...cached };
     }
 
-    // TODO: Query MongoDB
-    // const db = await getDatabase();
-    // return db.collection('meetings').findOne({ _id: meetingId, userId: this.userSession.userId });
+    // Query MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        const dbMeeting = await MeetingModel.findOne({
+          _id: meetingId,
+          userId: this.deps.userId,
+        });
+        if (dbMeeting) {
+          return this.dbMeetingToMeeting(dbMeeting);
+        }
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to get meeting:",
+          error,
+        );
+      }
+    }
 
     return null;
   }
@@ -438,14 +604,20 @@ export class MeetingManager {
    * Get meetings for a date
    */
   async getMeetingsForDate(date: string): Promise<Meeting[]> {
-    // TODO: Query MongoDB
-    // const db = await getDatabase();
-    // return db.collection('meetings').find({
-    //   userId: this.userSession.userId,
-    //   transcriptDate: date
-    // }).toArray();
+    // Query MongoDB if connected
+    if (isDBConnected()) {
+      try {
+        const dbMeetings = await dbGetMeetingsByDate(this.deps.userId, date);
+        return dbMeetings.map((m) => this.dbMeetingToMeeting(m));
+      } catch (error) {
+        this.deps.logger.error(
+          "[MeetingManager] Failed to get meetings for date:",
+          error,
+        );
+      }
+    }
 
-    // For now, filter from cache
+    // Fallback: filter from cache
     return this.recentMeetings.filter((m) => m.transcriptDate === date);
   }
 
@@ -501,6 +673,35 @@ export class MeetingManager {
     }
 
     return `${seconds}s`;
+  }
+
+  /**
+   * Convert DB meeting to our Meeting type
+   */
+  private dbMeetingToMeeting(dbMeeting: any): Meeting {
+    return {
+      _id: dbMeeting._id?.toString() || dbMeeting.id,
+      userId: dbMeeting.userId,
+      title: dbMeeting.title,
+      category: dbMeeting.category as MeetingCategory,
+      classificationConfidence: dbMeeting.confidence || 0,
+      presetId: dbMeeting.presetId,
+      status: dbMeeting.status as MeetingStatus,
+      startTime: dbMeeting.startTime,
+      endTime: dbMeeting.endTime,
+      transcriptDate: dbMeeting.date,
+      transcriptStartIndex: dbMeeting.transcriptRange?.startIndex || 0,
+      transcriptEndIndex: dbMeeting.transcriptRange?.endIndex,
+      attendees: dbMeeting.attendees || [],
+      topics: dbMeeting.topics || [],
+      isSensitive: dbMeeting.isSensitive || false,
+      sensitiveReason: dbMeeting.sensitiveReason,
+      noteId: dbMeeting.noteId,
+      actionItemIds: dbMeeting.actionItemIds || [],
+      researchIds: dbMeeting.researchIds || [],
+      createdAt: dbMeeting.createdAt,
+      updatedAt: dbMeeting.updatedAt,
+    };
   }
 
   /**

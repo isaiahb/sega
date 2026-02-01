@@ -476,15 +476,15 @@ export class SettingsManager {
     updates: Partial<
       Omit<MeetingPreset, "_id" | "userId" | "isSystem" | "createdAt">
     >,
-  ): Promise<void> {
+  ): Promise<MeetingPreset | null> {
     const index = this.presets.findIndex((p) => p._id === presetId);
     if (index === -1) {
-      throw new Error(`Preset not found: ${presetId}`);
+      return null;
     }
 
     const preset = this.presets[index];
     if (preset.isSystem) {
-      throw new Error("Cannot modify system presets");
+      return null;
     }
 
     this.presets[index] = {
@@ -496,6 +496,29 @@ export class SettingsManager {
     // TODO: Persist to MongoDB
 
     this.deps.logger.info(`[SettingsManager] Updated preset: ${preset.name}`);
+    return this.presets[index];
+  }
+
+  /**
+   * Remove a custom preset (alias for deletePreset)
+   */
+  async removePreset(presetId: string): Promise<boolean> {
+    const index = this.presets.findIndex((p) => p._id === presetId);
+    if (index === -1) {
+      return false;
+    }
+
+    const preset = this.presets[index];
+    if (preset.isSystem) {
+      return false;
+    }
+
+    this.presets.splice(index, 1);
+
+    // TODO: Delete from MongoDB
+
+    this.deps.logger.info(`[SettingsManager] Removed preset: ${preset.name}`);
+    return true;
   }
 
   /**
@@ -563,24 +586,42 @@ export class SettingsManager {
   }
 
   /**
-   * Add a sensitive topic
+   * Add a sensitive topic by keyword string
    */
   async addSensitiveTopic(
-    topic: Omit<SensitiveTopic, "_id" | "userId" | "createdAt">,
+    keywordOrTopic:
+      | string
+      | Omit<SensitiveTopic, "_id" | "userId" | "createdAt">,
   ): Promise<SensitiveTopic> {
-    const newTopic: SensitiveTopic = {
-      ...topic,
-      _id: `topic_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      userId: this.deps.userId,
-      createdAt: new Date(),
-    };
+    let newTopic: SensitiveTopic;
+
+    if (typeof keywordOrTopic === "string") {
+      // Simple keyword string
+      newTopic = {
+        _id: `topic_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        userId: this.deps.userId,
+        keyword: keywordOrTopic,
+        keywords: [keywordOrTopic.toLowerCase()],
+        action: "flag",
+        isSystem: false,
+        createdAt: new Date(),
+      };
+    } else {
+      // Full topic object
+      newTopic = {
+        ...keywordOrTopic,
+        _id: `topic_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        userId: this.deps.userId,
+        createdAt: new Date(),
+      };
+    }
 
     this.sensitiveTopics.push(newTopic);
 
     // TODO: Persist to MongoDB
 
     this.deps.logger.info(
-      `[SettingsManager] Added sensitive topic with ${topic.keywords.length} keywords`,
+      `[SettingsManager] Added sensitive topic: ${newTopic.keyword || newTopic.keywords?.[0]}`,
     );
     return newTopic;
   }
@@ -621,6 +662,28 @@ export class SettingsManager {
     // TODO: Delete from MongoDB
 
     this.deps.logger.info(`[SettingsManager] Deleted sensitive topic`);
+  }
+
+  /**
+   * Remove a sensitive topic (alias for deleteSensitiveTopic, returns boolean)
+   */
+  async removeSensitiveTopic(topicId: string): Promise<boolean> {
+    const index = this.sensitiveTopics.findIndex((t) => t._id === topicId);
+    if (index === -1) {
+      return false;
+    }
+
+    const topic = this.sensitiveTopics[index];
+    if (topic.isSystem) {
+      return false;
+    }
+
+    this.sensitiveTopics.splice(index, 1);
+
+    // TODO: Delete from MongoDB
+
+    this.deps.logger.info(`[SettingsManager] Removed sensitive topic`);
+    return true;
   }
 
   // ===========================================================================
