@@ -334,6 +334,20 @@ export class SettingsManager {
   }
 
   /**
+   * Check if email summaries are enabled
+   */
+  isEmailSummariesEnabled(): boolean {
+    return this.settings.emailSummaries ?? true; // Default to true for demo
+  }
+
+  /**
+   * Get user's email address
+   */
+  getEmailAddress(): string | undefined {
+    return this.settings.email || this.deps.userId; // Fall back to userId (which is email)
+  }
+
+  /**
    * Get autonomy level
    */
   getAutonomyLevel(): AutonomyLevel {

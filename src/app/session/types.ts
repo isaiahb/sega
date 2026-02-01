@@ -153,7 +153,11 @@ export interface Note {
 /**
  * Action item status
  */
-export type ActionItemStatus = "pending" | "in_progress" | "completed" | "cancelled";
+export type ActionItemStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 /**
  * Action item priority
@@ -297,6 +301,8 @@ export interface UserSettings {
   company?: string;
   /** User's role/title */
   role?: string;
+  /** Whether to send email summaries after meetings */
+  emailSummaries?: boolean;
   /** When settings were created */
   createdAt: Date;
   /** When settings were last updated */
@@ -372,11 +378,11 @@ export interface ResearchResult {
  * Session state tracked by AgentManager
  */
 export type SessionState =
-  | "idle"           // No active meeting, passively listening
-  | "detecting"      // Analyzing if a meeting is starting
-  | "in_meeting"     // Active meeting in progress
-  | "processing"     // Meeting ended, generating notes/actions
-  | "researching";   // Deep research in progress
+  | "idle" // No active meeting, passively listening
+  | "detecting" // Analyzing if a meeting is starting
+  | "in_meeting" // Active meeting in progress
+  | "processing" // Meeting ended, generating notes/actions
+  | "researching"; // Deep research in progress
 
 /**
  * Analysis result from the agent

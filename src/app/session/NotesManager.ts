@@ -47,13 +47,15 @@ export interface NotesManagerDeps {
   settings: {
     getPreset: (presetId: string) => MeetingPreset | undefined;
     getPresetForCategory: (category: string) => MeetingPreset | undefined;
+    isEmailSummariesEnabled?: () => boolean;
+    getEmailAddress?: () => string | undefined;
   };
   broadcast: {
     sendNotesReady: (
       noteId: string,
       meetingId: string,
       title: string,
-      summary: string
+      summary: string,
     ) => void;
     broadcast: (data: Record<string, unknown>) => void;
   };
@@ -61,6 +63,15 @@ export interface NotesManagerDeps {
     showNotesGenerating: () => void;
     showNotesReady: () => void;
     showError: (message: string) => void;
+    showMessage?: (text: string, options?: { duration?: number }) => void;
+  };
+  // Optional email manager for sending summaries
+  email?: {
+    sendMeetingSummary: (
+      meeting: Meeting,
+      note: Note,
+      actionItems: ActionItem[],
+    ) => Promise<boolean>;
   };
 }
 
@@ -138,7 +149,7 @@ export class NotesManager {
       this.deps.logger.info("[NotesManager] LLM provider initialized");
     } catch (error) {
       this.deps.logger.warn(
-        "[NotesManager] No LLM provider available - note generation disabled"
+        "[NotesManager] No LLM provider available - note generation disabled",
       );
     }
 
@@ -166,7 +177,9 @@ export class NotesManager {
     }
 
     this.deps.display.showNotesGenerating();
-    this.deps.logger.info(`[NotesManager] Generating notes for: ${meeting.title}`);
+    this.deps.logger.info(
+      `[NotesManager] Generating notes for: ${meeting.title}`,
+    );
 
     // Get transcript
     const transcript = this.deps.meeting.getMeetingTranscript(meeting);
@@ -188,7 +201,12 @@ export class NotesManager {
 
     try {
       // Generate notes with LLM
-      const result = await this.generateWithLLM(meeting, transcript, preset, noteRules);
+      const result = await this.generateWithLLM(
+        meeting,
+        transcript,
+        preset,
+        noteRules,
+      );
 
       if (!result) {
         this.deps.display.showError("Note generation failed");
@@ -220,7 +238,7 @@ export class NotesManager {
       const actionItems = await this.processActionItems(
         result.actionItems || [],
         meeting._id!,
-        note._id!
+        note._id!,
       );
 
       // Cache action items
@@ -237,18 +255,77 @@ export class NotesManager {
         note._id!,
         meeting._id!,
         note.title,
-        note.summary
+        note.summary,
       );
 
       this.deps.logger.info(
-        `[NotesManager] Notes generated: ${note.title} (${actionItems.length} action items)`
+        `[NotesManager] Notes generated: ${note.title} (${actionItems.length} action items)`,
       );
+
+      // Auto-send email summary if enabled
+      await this.sendEmailSummaryIfEnabled(meeting, note, actionItems);
 
       return note;
     } catch (error) {
       this.deps.logger.error("[NotesManager] Note generation failed:", error);
       this.deps.display.showError("Note generation failed");
       return null;
+    }
+  }
+
+  /**
+   * Send email summary if enabled in settings
+   */
+  private async sendEmailSummaryIfEnabled(
+    meeting: Meeting,
+    note: Note,
+    actionItems: ActionItem[],
+  ): Promise<void> {
+    // Check if email is available and enabled
+    if (!this.deps.email) {
+      this.deps.logger.info(
+        "[NotesManager] Email manager not available, skipping email",
+      );
+      return;
+    }
+
+    const emailEnabled = this.deps.settings.isEmailSummariesEnabled?.() ?? true; // Default to enabled for demo
+    if (!emailEnabled) {
+      this.deps.logger.info(
+        "[NotesManager] Email summaries disabled in settings",
+      );
+      return;
+    }
+
+    try {
+      this.deps.display.showMessage?.("📧 Sending email summary...", {
+        duration: 3000,
+      });
+
+      const sent = await this.deps.email.sendMeetingSummary(
+        meeting,
+        note,
+        actionItems,
+      );
+
+      if (sent) {
+        this.deps.logger.info("[NotesManager] Email summary sent successfully");
+        this.deps.display.showMessage?.("✅ Email sent!", { duration: 2000 });
+        this.deps.broadcast.broadcast({
+          type: "email_sent",
+          meetingId: meeting._id,
+          noteId: note._id,
+          timestamp: Date.now(),
+        });
+      } else {
+        this.deps.logger.warn("[NotesManager] Email sending returned false");
+      }
+    } catch (error) {
+      this.deps.logger.error(
+        "[NotesManager] Failed to send email summary:",
+        error,
+      );
+      // Don't show error to user - email is optional
     }
   }
 
@@ -264,7 +341,7 @@ export class NotesManager {
       captureDecisions: boolean;
       captureActionItems: boolean;
       customInstructions?: string;
-    }
+    },
   ): Promise<{
     title: string;
     summary: string;
@@ -288,12 +365,14 @@ export class NotesManager {
     const durationStr = this.formatDuration(durationMs);
 
     // Build prompt
-    const prompt = NOTES_GENERATION_PROMPT
-      .replace("{{TITLE}}", meeting.title)
+    const prompt = NOTES_GENERATION_PROMPT.replace("{{TITLE}}", meeting.title)
       .replace("{{CATEGORY}}", meeting.category)
       .replace("{{DURATION}}", durationStr)
       .replace("{{ATTENDEES}}", meeting.attendees.join(", ") || "Unknown")
-      .replace("{{USER_CONTEXT}}", preset?.userContext || "No specific context provided")
+      .replace(
+        "{{USER_CONTEXT}}",
+        preset?.userContext || "No specific context provided",
+      )
       .replace("{{DETAIL_LEVEL}}", noteRules.detailLevel)
       .replace("{{CAPTURE_DECISIONS}}", String(noteRules.captureDecisions))
       .replace("{{CAPTURE_ACTION_ITEMS}}", String(noteRules.captureActionItems))
@@ -301,7 +380,7 @@ export class NotesManager {
         "{{CUSTOM_INSTRUCTIONS}}",
         noteRules.customInstructions
           ? `- Custom Instructions: ${noteRules.customInstructions}`
-          : ""
+          : "",
       )
       .replace("{{TRANSCRIPT}}", transcript);
 
@@ -366,7 +445,10 @@ export class NotesManager {
         content: parsed.content || "",
       };
     } catch (error) {
-      this.deps.logger.error("[NotesManager] Failed to parse notes response:", error);
+      this.deps.logger.error(
+        "[NotesManager] Failed to parse notes response:",
+        error,
+      );
       return null;
     }
   }
@@ -394,7 +476,7 @@ export class NotesManager {
       sourceText?: string;
     }>,
     meetingId: string,
-    noteId: string
+    noteId: string,
   ): Promise<ActionItem[]> {
     const actionItems: ActionItem[] = [];
 
@@ -505,7 +587,7 @@ export class NotesManager {
    */
   async updateActionItemStatus(
     actionItemId: string,
-    status: "pending" | "in_progress" | "completed" | "cancelled"
+    status: "pending" | "in_progress" | "completed" | "cancelled",
   ): Promise<void> {
     // Update in cache
     for (const items of this.actionItemsCache.values()) {
@@ -520,7 +602,7 @@ export class NotesManager {
     // TODO: Persist to MongoDB
 
     this.deps.logger.info(
-      `[NotesManager] Action item ${actionItemId} status updated to ${status}`
+      `[NotesManager] Action item ${actionItemId} status updated to ${status}`,
     );
   }
 
