@@ -521,6 +521,24 @@ export class NotesManager {
   // ===========================================================================
 
   /**
+   * Get all cached notes (for API to return when DB is empty)
+   */
+  getAllCachedNotes(): Note[] {
+    return Array.from(this.notesCache.values());
+  }
+
+  /**
+   * Get all cached action items (for API to return when DB is empty)
+   */
+  getAllCachedActionItems(): ActionItem[] {
+    const allItems: ActionItem[] = [];
+    for (const items of this.actionItemsCache.values()) {
+      allItems.push(...items);
+    }
+    return allItems;
+  }
+
+  /**
    * Get note by ID
    */
   async getNoteById(noteId: string): Promise<Note | null> {
