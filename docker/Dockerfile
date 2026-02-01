@@ -27,7 +27,7 @@ RUN bun install
 COPY . .
 
 # Build webview for production
-RUN bun run build:webview
+# RUN bun run build:webview
 
 # Set production environment
 ENV NODE_ENV=production
