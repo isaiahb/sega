@@ -615,12 +615,19 @@ export class DisplayManager {
   /**
    * Broadcast display preview to webview
    */
-  private broadcastDisplayPreview(text: string, isFinal: boolean): void {
+  private broadcastDisplayPreview(
+    text: string | string[],
+    isFinal: boolean = true,
+  ): void {
     if (this.deps.broadcast) {
+      // Handle both string and array inputs
+      const textStr = Array.isArray(text) ? text.join("\n") : text || "";
+      const lines = Array.isArray(text) ? text : (text || "").split("\n");
+
       this.deps.broadcast.broadcast({
         type: "display_preview",
-        text,
-        lines: text.split("\n"),
+        text: textStr,
+        lines,
         isFinal,
         timestamp: Date.now(),
       });

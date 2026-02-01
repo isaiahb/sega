@@ -532,20 +532,50 @@ api.get("/notes", async (c: Context) => {
 
   const date = c.req.query("date");
 
+  // Try DB first
   if (isDBConnected()) {
     try {
       const query: any = { userId };
       const notes = await NoteModel.find(query)
         .sort({ createdAt: -1 })
         .limit(50);
-      return c.json(
-        notes.map((n) => ({
-          id: n._id?.toString(),
-          ...n.toObject(),
-        })),
-      );
+      if (notes.length > 0) {
+        return c.json(
+          notes.map((n) => ({
+            id: n._id?.toString(),
+            ...n.toObject(),
+          })),
+        );
+      }
     } catch (error) {
       console.error("[API] Notes fetch error:", error);
+    }
+  }
+
+  // Fall back to in-memory session cache
+  const session = UserSession.get(userId);
+  if (session) {
+    const cachedNotes = session.notes.getAllCachedNotes();
+    if (cachedNotes.length > 0) {
+      return c.json(
+        cachedNotes.map((n) => ({
+          id: n._id,
+          meetingId: n.meetingId,
+          title: n.title,
+          summary: n.summary,
+          keyPoints: n.keyPoints,
+          decisions: n.decisions,
+          content: n.content,
+          detailLevel: n.detailLevel,
+          date: n.createdAt?.toISOString().split("T")[0],
+          timeRange: {
+            start: n.createdAt?.toISOString(),
+            end: n.updatedAt?.toISOString(),
+          },
+          createdAt: n.createdAt,
+          updatedAt: n.updatedAt,
+        })),
+      );
     }
   }
 
@@ -822,6 +852,7 @@ api.get("/actions", async (c: Context) => {
   const status = c.req.query("status");
   const priority = c.req.query("priority");
 
+  // Try DB first
   if (isDBConnected()) {
     try {
       const query: any = { userId };
@@ -832,16 +863,51 @@ api.get("/actions", async (c: Context) => {
         priority: -1,
         dueDate: 1,
       });
-      return c.json(
-        items.map((item) => ({
-          id: item._id?.toString(),
-          task: item.description,
-          owner: item.assignee || "",
-          ...item.toObject(),
-        })),
-      );
+      if (items.length > 0) {
+        return c.json(
+          items.map((item) => ({
+            id: item._id?.toString(),
+            task: item.description,
+            owner: item.assignee || "",
+            ...item.toObject(),
+          })),
+        );
+      }
     } catch (error) {
       console.error("[API] Actions fetch error:", error);
+    }
+  }
+
+  // Fall back to in-memory session cache
+  const session = UserSession.get(userId);
+  if (session) {
+    let cachedItems = session.notes.getAllCachedActionItems();
+
+    // Apply filters
+    if (status) {
+      cachedItems = cachedItems.filter((item) => item.status === status);
+    }
+    if (priority) {
+      cachedItems = cachedItems.filter((item) => item.priority === priority);
+    }
+
+    if (cachedItems.length > 0) {
+      return c.json(
+        cachedItems.map((item) => ({
+          id: item._id,
+          task: item.description,
+          owner: item.assignee || "",
+          description: item.description,
+          assignee: item.assignee,
+          dueDate: item.dueDate,
+          priority: item.priority,
+          status: item.status,
+          meetingId: item.meetingId,
+          noteId: item.noteId,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        })),
+      );
     }
   }
 

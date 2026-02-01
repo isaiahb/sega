@@ -101,13 +101,10 @@ async function runDemo() {
     console.log(`[${i + 1}/${SAMPLE_TRANSCRIPT.length}] "${text}"`);
 
     // Simulate transcript segment
-    session.onTranscription({
-      text,
-      isFinal,
-      timestamp: Date.now(),
-      speakerHint:
-        i % 3 === 0 ? "Speaker A" : i % 3 === 1 ? "Speaker B" : undefined,
-    });
+    // onTranscription expects: (text: string, isFinal: boolean, speakerId?: string)
+    const speakerId =
+      i % 3 === 0 ? "Speaker A" : i % 3 === 1 ? "Speaker B" : undefined;
+    session.onTranscription(text, isFinal, speakerId);
 
     // Small delay between segments
     await sleep(500);

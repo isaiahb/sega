@@ -140,8 +140,9 @@ export class BroadcastManager {
    * Send transcript update
    */
   sendTranscript(text: string, isFinal: boolean, speakerHint?: string): void {
+    const safeText = text || "";
     console.log(
-      `[BroadcastManager] Sending transcript to user ${this.userId}: "${text.substring(0, 50)}..." (isFinal: ${isFinal})`,
+      `[BroadcastManager] Sending transcript to user ${this.userId}: "${safeText.substring(0, 50)}..." (isFinal: ${isFinal})`,
     );
     console.log(
       `[BroadcastManager] Global clients count: ${BroadcastManager.globalClients.size}`,
