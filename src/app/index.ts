@@ -61,6 +61,7 @@ export class SegaApp extends AppServer {
     userId: string,
   ): Promise<void> {
     console.log(`\n🎯 SEGA session started for ${userId}`);
+    session.dashboard.content.write("// SEGA Ready");
 
     // Get or create UserSession for this user
     const userSession = await UserSession.getOrCreate(userId, session);

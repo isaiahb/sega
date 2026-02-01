@@ -2,6 +2,32 @@
 
 All notable changes to the SEGA (Smart Executive Glasses Assistant) project.
 
+## [WIP] - Demo Preparation (2025-02-01)
+
+### Demo Status
+**Goal:** End-to-end demo showing glasses displaying live info, deep research, meeting notes, and email.
+
+### Completed
+- ✅ SSE broadcast fix - BroadcastManager now sends to ALL clients for a user
+- ✅ Switched AI agent to Claude Opus 4 for smarter analysis
+- ✅ Auto-start meetings without user confirmation
+- ✅ Added dashboard status updates on glasses (`SEGA • Monitoring`, `📋 In Meeting`, etc.)
+- ✅ Added `session_started` event when glasses connect
+- ✅ Removed mock data from Notes, Actions, Agents views
+- ✅ Disabled sensitive topic detection for demo simplicity
+
+### Known Issues (WIP)
+- ⚠️ **TodayView live transcripts** - SSE events received by browser but React component not updating UI (another engineer fixing)
+- ⚠️ **WebSocket CLOSED errors** - Glasses connection dropping, need to handle reconnection gracefully
+
+### Remaining for Demo
+- [ ] Notes page - show real meeting notes
+- [ ] Deep research working e2e with Firecrawl
+- [ ] Email sending after meeting ends
+- [ ] Polish glasses display for judges
+
+---
+
 ## [Released] - All Branches Synced
 
 ### Branch Status (as of 2025-02-01)

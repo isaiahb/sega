@@ -189,7 +189,16 @@ export class UserSession {
       display: this.display,
     });
 
-    // NotesManager needs userId, logger, transcript, meeting, settings, broadcast, display
+    // EmailManager needs userId, logger, settings, broadcast
+    // NOTE: Created before NotesManager so we can pass it for auto-email
+    this.email = new EmailManager({
+      userId: this.userId,
+      logger: this.logger,
+      settings: this.settings,
+      broadcast: this.broadcast,
+    });
+
+    // NotesManager needs userId, logger, transcript, meeting, settings, broadcast, display, email
     this.notes = new NotesManager({
       userId: this.userId,
       logger: this.logger,
@@ -198,6 +207,7 @@ export class UserSession {
       settings: this.settings,
       broadcast: this.broadcast,
       display: this.display,
+      email: this.email,
     });
 
     // ResearchManager needs userId, logger, meeting, broadcast, display
@@ -207,14 +217,6 @@ export class UserSession {
       meeting: this.meeting,
       broadcast: this.broadcast,
       display: this.display,
-    });
-
-    // EmailManager needs userId, logger, settings, broadcast
-    this.email = new EmailManager({
-      userId: this.userId,
-      logger: this.logger,
-      settings: this.settings,
-      broadcast: this.broadcast,
     });
 
     // AgentManager needs userId, logger, transcript, meeting, settings, broadcast, display, notes, research
