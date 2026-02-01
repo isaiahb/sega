@@ -124,7 +124,16 @@ const MIN_TRANSCRIPT_LENGTH = 50;
 const ENABLE_SENSITIVE_TOPIC_DETECTION = false;
 
 /** Keywords that trigger immediate analysis */
-const TRIGGER_KEYWORDS = ["sega", "hey sega", "ok sega", "okay sega"];
+const TRIGGER_KEYWORDS = [
+  "sega",
+  "hey sega",
+  "ok sega",
+  "okay sega",
+  "seka",
+  "hey seka",
+  "ok seka",
+  "okay seka",
+];
 
 /** Meeting detection prompt */
 const MEETING_DETECTION_PROMPT = `You are an AI assistant analyzing a conversation transcript to detect if a meeting/conversation has started or ended.
@@ -437,8 +446,8 @@ export class AgentManager {
   ): { type: string; content: string } | null {
     const lower = text.toLowerCase();
 
-    // Must contain "sega" to be a command
-    if (!lower.includes("sega")) return null;
+    // Must contain "sega" or "seka" (common misheard) to be a command
+    if (!lower.includes("sega") && !lower.includes("seka")) return null;
 
     // End meeting commands
     if (
@@ -464,7 +473,7 @@ export class AgentManager {
 
     // Research commands - extract the query
     const researchMatch = lower.match(
-      /sega[,.]?\s*(?:research|look up|find|search)\s+(.+)/i,
+      /(?:sega|seka)[,.]?\s*(?:research|look up|find|search)\s+(.+)/i,
     );
     if (researchMatch) {
       return { type: "research", content: researchMatch[1].trim() };
