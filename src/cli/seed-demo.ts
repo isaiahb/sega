@@ -1,584 +1,695 @@
 /**
- * Demo Seed Script
- * Populates the database with sample data and sends test emails for demo purposes
+ * Demo Seed Script - Executive Lens Hackathon
+ * Populates the database with hackathon day data for demo purposes
  *
  * Usage:
  *   bun run src/cli/seed-demo.ts
- *   bun run src/cli/seed-demo.ts --user=isaiahballah@gmail.com
- *   bun run src/cli/seed-demo.ts --skip-email
- *   bun run src/cli/seed-demo.ts --skip-db
+ *   bun run src/cli/seed-demo.ts --clear (clears all data first)
+ *   bun run src/cli/seed-demo.ts --skip-email (skip sending email)
  */
 
+import mongoose from "mongoose";
 import { Resend } from "resend";
 import {
   connectDB,
   disconnectDB,
-  isDBConnected,
   Meeting as MeetingModel,
   Note as NoteModel,
   ActionItem as ActionItemModel,
   DailyTranscript as DailyTranscriptModel,
+  ResearchResult as ResearchResultModel,
 } from "../services/db";
 
-// Parse command line args
+// Generate ObjectIds for relationships
+const meetingIds = {
+  kickoff: new mongoose.Types.ObjectId(),
+  frontend: new mongoose.Types.ObjectId(),
+  demo: new mongoose.Types.ObjectId(),
+};
+
 const args = process.argv.slice(2);
-const userId =
-  args.find((a) => a.startsWith("--user="))?.split("=")[1] ||
-  "isaiahballah@gmail.com";
+const userId = "isaiahballah@gmail.com";
+const shouldClear = args.includes("--clear");
 const skipEmail = args.includes("--skip-email");
-const skipDB = args.includes("--skip-db");
 
 console.log("\n========================================");
-console.log("🌱 SEGA Demo Seed Script");
+console.log("🌱 Executive Lens Hackathon Demo Seed");
 console.log("========================================\n");
 console.log(`User: ${userId}`);
-console.log(`Skip Email: ${skipEmail}`);
-console.log(`Skip DB: ${skipDB}`);
+console.log(`Clear existing data: ${shouldClear}`);
+console.log(`Skip email: ${skipEmail}`);
 console.log("");
 
-// Sample demo data
-const DEMO_MEETINGS = [
+// Get today's date at different times
+const today = new Date();
+const todayAt = (hour: number, minute: number = 0) => {
+  const d = new Date(today);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+};
+
+// Hackathon day transcript - discussions about building Executive Lens
+const TRANSCRIPT_SEGMENTS = [
+  // Morning kickoff - 9:00 AM
   {
-    title: "Q1 Investor Update",
-    category: "investor_update",
-    startTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    endTime: new Date(Date.now() - 1.5 * 60 * 60 * 1000), // 1.5 hours ago
-    attendees: ["Sarah Chen (Sequoia)", "Michael Park (a16z)", "You"],
-    topics: ["Revenue Growth", "Product Roadmap", "Hiring Plans", "Series B"],
-    status: "complete",
+    time: todayAt(9, 0),
+    speaker: "Isaiah",
+    text: "Alright team, hackathon day! Let's build something amazing with the Even Realities G1 glasses.",
   },
   {
-    title: "Product Roadmap Planning",
+    time: todayAt(9, 1),
+    speaker: "Aryan",
+    text: "I'm excited! So we're building an executive assistant that runs on smart glasses?",
+  },
+  {
+    time: todayAt(9, 2),
+    speaker: "Isaiah",
+    text: "Exactly. We're calling it Executive Lens - or SEGA internally. Smart Executive Glasses Assistant.",
+  },
+  {
+    time: todayAt(9, 3),
+    speaker: "Parth",
+    text: "I love the concept. Real-time meeting intelligence displayed right in your field of view.",
+  },
+  {
+    time: todayAt(9, 5),
+    speaker: "Isaiah",
+    text: "The key insight is that executives are in meetings all day. What if we could give them superpowers?",
+  },
+  {
+    time: todayAt(9, 6),
+    speaker: "Aryan",
+    text: "Like automatic note-taking, action item extraction, and real-time research?",
+  },
+  {
+    time: todayAt(9, 7),
+    speaker: "Isaiah",
+    text: "Yes! And it all happens automatically. The glasses listen, understand context, and surface relevant info.",
+  },
+  {
+    time: todayAt(9, 10),
+    speaker: "Parth",
+    text: "For the UI, I'm thinking clean and minimal. The Today view should show the glasses status and live transcript.",
+  },
+  {
+    time: todayAt(9, 12),
+    speaker: "Isaiah",
+    text: "Perfect. Let's divide and conquer. Parth on design, Aryan on frontend, I'll handle the backend and AI.",
+  },
+
+  // Architecture discussion - 10:00 AM
+  {
+    time: todayAt(10, 0),
+    speaker: "Isaiah",
+    text: "Let me walk you through the architecture. We have a UserSession that manages all the state for each user.",
+  },
+  {
+    time: todayAt(10, 2),
+    speaker: "Aryan",
+    text: "So each user gets their own session with managers for transcripts, meetings, notes, and research?",
+  },
+  {
+    time: todayAt(10, 3),
+    speaker: "Isaiah",
+    text: "Exactly. The AgentManager is the brain - it analyzes transcripts and orchestrates everything.",
+  },
+  {
+    time: todayAt(10, 5),
+    speaker: "Parth",
+    text: "What about the glasses display? How do we show information to the user?",
+  },
+  {
+    time: todayAt(10, 6),
+    speaker: "Isaiah",
+    text: "The DisplayManager handles that. It can show messages, notifications, and even a dashboard view.",
+  },
+  {
+    time: todayAt(10, 8),
+    speaker: "Aryan",
+    text: "And the web UI connects via Server-Sent Events for real-time updates?",
+  },
+  {
+    time: todayAt(10, 9),
+    speaker: "Isaiah",
+    text: "Right. The BroadcastManager pushes events to all connected clients - transcripts, meeting status, research progress.",
+  },
+  {
+    time: todayAt(10, 15),
+    speaker: "Isaiah",
+    text: "For the AI, I'm using Gemini for meeting detection and notes generation. It's fast and accurate.",
+  },
+  {
+    time: todayAt(10, 17),
+    speaker: "Parth",
+    text: "Can users trigger actions with voice commands?",
+  },
+  {
+    time: todayAt(10, 18),
+    speaker: "Isaiah",
+    text: "Yes! Say 'Hey Sega, send me the meeting notes' and it compiles everything and emails it to you.",
+  },
+
+  // Frontend deep dive - 11:30 AM
+  {
+    time: todayAt(11, 30),
+    speaker: "Aryan",
+    text: "The TodayView is coming together. I have the G1 status bar showing connection state.",
+  },
+  {
+    time: todayAt(11, 32),
+    speaker: "Parth",
+    text: "Make sure the glasses image transitions smoothly to the HUD view when recording starts.",
+  },
+  {
+    time: todayAt(11, 34),
+    speaker: "Aryan",
+    text: "Got it. I'm using Framer Motion for all the animations. The transcript scrolls automatically too.",
+  },
+  {
+    time: todayAt(11, 36),
+    speaker: "Isaiah",
+    text: "Nice! How's the SSE integration working?",
+  },
+  {
+    time: todayAt(11, 37),
+    speaker: "Aryan",
+    text: "Great. The useSSE hook handles reconnection and event parsing. All transcript events show up immediately.",
+  },
+  {
+    time: todayAt(11, 40),
+    speaker: "Parth",
+    text: "For the Notes view, I want a clean folder structure. Notes grouped by date with expandable details.",
+  },
+  {
+    time: todayAt(11, 42),
+    speaker: "Aryan",
+    text: "And the Actions view should show task status - todo, in progress, done. With filters.",
+  },
+
+  // Lunch break discussion - 12:30 PM
+  {
+    time: todayAt(12, 30),
+    speaker: "Isaiah",
+    text: "Quick sync over lunch. How are we feeling about the demo?",
+  },
+  {
+    time: todayAt(12, 32),
+    speaker: "Parth",
+    text: "Design is solid. The horizontal G1 status bar looks much better than the vertical layout.",
+  },
+  {
+    time: todayAt(12, 34),
+    speaker: "Aryan",
+    text: "Frontend is almost there. Just need to wire up the demo command flow.",
+  },
+  {
+    time: todayAt(12, 36),
+    speaker: "Isaiah",
+    text: "I'll add a special command - when you say 'send me the meeting notes', it triggers a demo sequence.",
+  },
+  {
+    time: todayAt(12, 38),
+    speaker: "Aryan",
+    text: "That would be perfect for the presentation. Show the whole flow from voice command to email.",
+  },
+
+  // Afternoon coding - 2:00 PM
+  {
+    time: todayAt(14, 0),
+    speaker: "Isaiah",
+    text: "The demo flow is working. It shows progress on both the glasses and the web UI.",
+  },
+  {
+    time: todayAt(14, 2),
+    speaker: "Parth",
+    text: "Can you walk us through what happens when you trigger it?",
+  },
+  {
+    time: todayAt(14, 4),
+    speaker: "Isaiah",
+    text: "Sure. First it acknowledges the command on the glasses. Then it shows 'Analyzing transcript'...",
+  },
+  {
+    time: todayAt(14, 5),
+    speaker: "Isaiah",
+    text: "Then 'Found 12 key topics, extracting action items'. Each step broadcasts to the web UI too.",
+  },
+  {
+    time: todayAt(14, 7),
+    speaker: "Aryan",
+    text: "And the transcript view shows system messages for each step?",
+  },
+  {
+    time: todayAt(14, 8),
+    speaker: "Isaiah",
+    text: "Exactly. Green highlighted messages like '🔍 Starting research' and '✅ Complete'.",
+  },
+  {
+    time: todayAt(14, 12),
+    speaker: "Parth",
+    text: "Love it. The visual feedback makes it feel alive and intelligent.",
+  },
+
+  // Testing and polish - 4:00 PM
+  {
+    time: todayAt(16, 0),
+    speaker: "Aryan",
+    text: "Found a bug - the interim text wasn't clearing after final transcript. Fixed it.",
+  },
+  {
+    time: todayAt(16, 5),
+    speaker: "Isaiah",
+    text: "Good catch. I also improved the voice command detection. Now it handles variations better.",
+  },
+  {
+    time: todayAt(16, 8),
+    speaker: "Parth",
+    text: "The loading states look good. Skeleton loaders while fetching data.",
+  },
+  {
+    time: todayAt(16, 12),
+    speaker: "Isaiah",
+    text: "Let's do a full run-through. Aryan, can you trigger the demo command?",
+  },
+  {
+    time: todayAt(16, 14),
+    speaker: "Aryan",
+    text: "Hey Sega, send me the meeting notes.",
+  },
+  {
+    time: todayAt(16, 15),
+    speaker: "Isaiah",
+    text: "Perfect! Watch the glasses... 'Got it, gathering meeting notes'... now analyzing...",
+  },
+  {
+    time: todayAt(16, 17),
+    speaker: "Parth",
+    text: "The web UI is updating in real-time. This is really impressive.",
+  },
+
+  // Final prep - 5:30 PM
+  {
+    time: todayAt(17, 30),
+    speaker: "Isaiah",
+    text: "Alright, we're in good shape. Let's prep for the final demo.",
+  },
+  {
+    time: todayAt(17, 32),
+    speaker: "Aryan",
+    text: "I'll make sure the seed data is loaded so we have realistic transcripts to show.",
+  },
+  {
+    time: todayAt(17, 34),
+    speaker: "Parth",
+    text: "And I'll double-check the responsive design. It should look good on the projector.",
+  },
+  {
+    time: todayAt(17, 36),
+    speaker: "Isaiah",
+    text: "Great teamwork today. Executive Lens is going to blow them away.",
+  },
+  {
+    time: todayAt(17, 38),
+    speaker: "Aryan",
+    text: "From idea to working demo in one day. That's what hackathons are all about!",
+  },
+  {
+    time: todayAt(17, 40),
+    speaker: "Parth",
+    text: "The MentraOS integration is seamless. This could be a real product.",
+  },
+];
+
+// Meetings for the day
+const dateStr = today.toISOString().split("T")[0];
+
+const MEETINGS = [
+  {
+    _id: meetingIds.kickoff,
+    userId,
+    date: dateStr,
+    title: "Executive Lens Hackathon Kickoff",
     category: "team_standup",
-    startTime: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    endTime: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    attendees: ["John (Engineering)", "Lisa (Design)", "You"],
-    topics: ["Q2 Features", "Technical Debt", "Design System"],
-    status: "complete",
+    startTime: todayAt(9, 0),
+    endTime: todayAt(10, 30),
+    attendees: ["Isaiah", "Aryan", "Parth"],
+    topics: ["Product Vision", "Architecture", "Task Assignment"],
+    status: "complete" as const,
+    transcriptRange: { startIndex: 0, endIndex: 17 },
+    classification: {
+      category: "team_standup",
+      title: "Executive Lens Hackathon Kickoff",
+      confidence: 0.95,
+      attendees: ["Isaiah", "Aryan", "Parth"],
+    },
   },
   {
-    title: "Client Demo - Acme Corp",
-    category: "client_call",
-    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-    endTime: new Date(Date.now() - 23.5 * 60 * 60 * 1000),
-    attendees: ["Bob Smith (Acme Corp)", "Jane Doe (Acme Corp)", "You"],
-    topics: ["Product Demo", "Pricing", "Integration"],
-    status: "complete",
+    _id: meetingIds.frontend,
+    userId,
+    date: dateStr,
+    title: "Frontend Architecture Sync",
+    category: "team_standup",
+    startTime: todayAt(11, 30),
+    endTime: todayAt(12, 15),
+    attendees: ["Isaiah", "Aryan", "Parth"],
+    topics: ["React Components", "SSE Integration", "Animations"],
+    status: "complete" as const,
+    transcriptRange: { startIndex: 18, endIndex: 28 },
+    classification: {
+      category: "team_standup",
+      title: "Frontend Architecture Sync",
+      confidence: 0.92,
+      attendees: ["Isaiah", "Aryan", "Parth"],
+    },
+  },
+  {
+    _id: meetingIds.demo,
+    userId,
+    date: dateStr,
+    title: "Demo Preparation & Testing",
+    category: "team_standup",
+    startTime: todayAt(16, 0),
+    endTime: todayAt(17, 45),
+    attendees: ["Isaiah", "Aryan", "Parth"],
+    topics: ["Bug Fixes", "Demo Flow", "Final Polish"],
+    status: "complete" as const,
+    transcriptRange: { startIndex: 29, endIndex: 50 },
+    classification: {
+      category: "team_standup",
+      title: "Demo Preparation & Testing",
+      confidence: 0.94,
+      attendees: ["Isaiah", "Aryan", "Parth"],
+    },
   },
 ];
 
-const DEMO_NOTES = [
+// Notes for the day
+const NOTES = [
   {
-    title: "Q1 Investor Update",
+    meetingId: meetingIds.kickoff,
+    userId,
+    title: "Executive Lens Hackathon Kickoff",
     summary:
-      "Productive investor update covering Q1 results. Revenue grew 45% QoQ to $2.3M ARR. Discussed Series B timeline and hiring plans for engineering team expansion.",
+      "Kicked off the hackathon with a clear vision for Executive Lens - an AI-powered assistant for smart glasses that helps executives during meetings with real-time transcription, intelligent note-taking, and contextual research.",
     keyPoints: [
-      "Revenue hit $2.3M ARR, up 45% from last quarter",
-      "User retention at 94%, above industry average",
-      "Planning to double engineering team by Q3",
-      "Series B discussions to begin in April",
+      "Product name: Executive Lens (internal codename: SEGA)",
+      "Target user: Busy executives who are in meetings all day",
+      "Key features: Live transcription, automatic notes, action item extraction, voice commands",
+      "Architecture: UserSession pattern with specialized managers for each capability",
+      "AI: Using Gemini for meeting detection and notes generation",
     ],
     decisions: [
-      "Proceed with Series B fundraising in April",
-      "Hire 5 senior engineers before end of Q2",
-      "Expand to European market in H2",
+      "Isaiah handles backend and AI integration",
+      "Aryan builds the frontend with React and Framer Motion",
+      "Parth designs the UI/UX with focus on clean, minimal interface",
     ],
-    content: `# Q1 Investor Update - Meeting Notes
+    detailLevel: "detailed",
+    content: `# Executive Lens Hackathon Kickoff
 
-## Key Metrics
-- **ARR**: $2.3M (↑45% QoQ)
-- **User Retention**: 94%
-- **MRR Growth**: 12% month-over-month
+## Vision
+Building an AI-powered executive assistant that runs on Even Realities G1 smart glasses. The glasses listen to meetings, understand context, and provide real-time intelligence.
 
-## Discussion Points
+## Architecture Overview
+- **UserSession**: Central state management per user
+- **AgentManager**: The "brain" that analyzes transcripts and orchestrates actions
+- **TranscriptManager**: Handles real-time transcription buffering
+- **MeetingManager**: Detects meeting start/end, classifies meeting types
+- **NotesManager**: Generates meeting notes with AI
+- **ResearchManager**: Performs deep research on mentioned entities
+- **DisplayManager**: Controls what shows on the glasses
+- **BroadcastManager**: SSE events to web UI
 
-### Revenue & Growth
-Sarah was impressed with our growth trajectory. She mentioned this puts us in the top quartile of their portfolio companies at this stage.
-
-### Product Roadmap
-Michael asked about our AI features. We demoed SEGA and he was very interested in the meeting intelligence capabilities.
-
-### Hiring Plans
-Both investors support aggressive hiring. They recommended focusing on senior engineers who can mentor the team.
-
-### Series B
-Consensus to start Series B process in April. Target raise: $15-20M at $80-100M valuation.
-
-## Next Steps
-1. Send updated financial model by Friday
-2. Schedule follow-up for Series B kick-off
-3. Share product roadmap document`,
+## Tech Stack
+- Backend: Bun + Hono
+- Frontend: React + Tailwind + Framer Motion
+- AI: Google Gemini
+- Real-time: Server-Sent Events
+- Database: MongoDB`,
+    createdAt: todayAt(10, 30),
+    updatedAt: todayAt(10, 30),
   },
   {
-    title: "Product Roadmap Planning",
+    meetingId: meetingIds.frontend,
+    userId,
+    title: "Frontend Architecture Sync",
     summary:
-      "Team sync on Q2 roadmap priorities. Agreed to focus on enterprise features and API improvements. Design system overhaul planned for late Q2.",
+      "Deep dive into the frontend implementation. Decided on horizontal G1 status bar layout, SSE integration via useSSE hook, and Framer Motion for smooth animations.",
     keyPoints: [
-      "Q2 focus: Enterprise features and API v2",
-      "Design system overhaul scheduled for May",
-      "Technical debt sprint planned for April",
-      "New dashboard wireframes ready for review",
+      "TodayView is the main dashboard showing glasses status and live transcript",
+      "G1 status bar: horizontal layout at top, shows connection state and HUD preview",
+      "useSSE hook handles real-time event streaming with automatic reconnection",
+      "Transcript auto-scrolls and shows interim text with typing indicator",
+      "System messages highlighted in green for research/command progress",
     ],
     decisions: [
-      "Prioritize SSO and audit logs for enterprise",
-      "Allocate 2 weeks for technical debt in April",
-      "Launch design system v2 by end of May",
+      "Use horizontal layout for G1 status (not vertical)",
+      "Transcript takes full width below status bar",
+      "Framer Motion AnimatePresence for smooth state transitions",
     ],
-    content: `# Product Roadmap Planning - Meeting Notes
+    detailLevel: "detailed",
+    content: `# Frontend Architecture Sync
 
-## Q2 Priorities
+## Component Structure
+- **TodayView**: Main dashboard
+  - G1StatusBar: Connection status, HUD preview
+  - LiveTranscript: Real-time transcription display
 
-### Enterprise Features (High Priority)
-- SSO integration (SAML, OIDC)
-- Audit logs and compliance
-- Role-based access control
-- Custom branding
+- **NotesView**: Meeting notes browser
+  - Grouped by date
+  - Expandable note details
 
-### API Improvements
-- API v2 with GraphQL support
-- Webhook improvements
-- Better rate limiting
-- SDK updates for Python and Go
+- **ActionsView**: Task management
+  - Filter by status (todo, in progress, done)
+  - Quick status updates
 
-### Design System
-- Component library refresh
-- Dark mode improvements
-- Accessibility audit
-- Mobile responsive updates
+## Real-time Integration
+The useSSE hook connects to /api/sse and handles:
+- Automatic reconnection on disconnect
+- Event type parsing
+- Event history for debugging
 
-## Timeline
-- April: Technical debt sprint + SSO
-- May: API v2 + Design system
-- June: Enterprise launch
-
-## Action Items
-- [ ] John to scope SSO implementation
-- [ ] Lisa to finalize design system specs
-- [ ] Schedule enterprise beta with 3 customers`,
+## Animation Strategy
+Using Framer Motion for:
+- Page transitions
+- Transcript item entrance
+- Status bar state changes
+- Loading states`,
+    createdAt: todayAt(12, 15),
+    updatedAt: todayAt(12, 15),
   },
   {
-    title: "Client Demo - Acme Corp",
+    meetingId: meetingIds.demo,
+    userId,
+    title: "Demo Preparation & Testing",
     summary:
-      "Successful product demo with Acme Corp. They're interested in enterprise plan for 500 users. Follow-up scheduled to discuss pricing and integration requirements.",
+      "Final testing and polish before the demo. Added 'send me the meeting notes' voice command that triggers a full demo flow showing progress on glasses and web UI simultaneously.",
     keyPoints: [
-      "Acme Corp has 500 potential users",
-      "Main interest: meeting intelligence and CRM integration",
-      "Current solution: manual note-taking, very inefficient",
-      "Budget approved for Q2 software purchases",
+      "Demo command: 'Hey Sega, send me the meeting notes'",
+      "Flow shows step-by-step progress on glasses HUD",
+      "Web UI receives real-time updates via SSE",
+      "System messages appear in transcript: 🔍 Starting, 📊 Progress, ✅ Complete",
+      "Full flow takes about 15 seconds - perfect for demo",
     ],
     decisions: [
-      "Send custom proposal by end of week",
-      "Arrange technical deep-dive with their IT team",
-      "Offer 30-day pilot program",
+      "Keep demo flow to ~15 seconds for presentation",
+      "Show both glasses and web UI side by side during demo",
+      "Pre-load realistic transcript data for demo",
     ],
-    content: `# Client Demo - Acme Corp - Meeting Notes
+    detailLevel: "detailed",
+    content: `# Demo Preparation & Testing
 
-## Attendees
-- Bob Smith (VP of Sales, Acme Corp)
-- Jane Doe (IT Director, Acme Corp)
-- Us
+## Demo Flow
+1. User says: "Hey Sega, send me the meeting notes"
+2. Glasses show: "📋 Got it! Gathering meeting notes..."
+3. Web UI shows: "🔍 Starting: Meeting notes compilation"
+4. Glasses show: "🔍 Analyzing transcript..."
+5. Web UI shows: "📊 Analyzing meeting transcript..."
+6. Glasses show: "📊 Found 12 key topics..."
+7. Glasses show: "✍️ Generating summary..."
+8. Glasses show: "📧 Preparing email..."
+9. Glasses show: "✅ Notes ready! Sending to email..."
+10. Web UI shows: "✅ Complete: Meeting notes compiled"
 
-## Demo Highlights
+## Bug Fixes
+- Fixed interim text not clearing after final transcript
+- Improved voice command detection variations
+- Added auto-scroll to transcript
 
-### What Resonated
-- Real-time transcription accuracy impressed them
-- Action item extraction saves hours per week
-- CRM integration is a must-have for their sales team
-
-### Concerns Raised
-- Data security and compliance (SOC 2)
-- Integration with their existing Salesforce setup
-- Onboarding time for 500 users
-
-## Next Steps
-1. Send SOC 2 compliance documentation
-2. Prepare Salesforce integration demo
-3. Create custom pricing proposal for 500 seats
-4. Schedule technical deep-dive for next Tuesday
-
-## Opportunity Details
-- **Deal Size**: ~$150K ARR
-- **Timeline**: Q2 decision
-- **Champion**: Bob Smith
-- **Decision Maker**: Jane Doe (budget holder)`,
+## Final Checklist
+- [x] Seed data loaded
+- [x] SSE connection stable
+- [x] Animations smooth
+- [x] Responsive on projector`,
+    createdAt: todayAt(17, 45),
+    updatedAt: todayAt(17, 45),
   },
 ];
 
-const DEMO_ACTION_ITEMS = [
+// Action items
+const ACTION_ITEMS = [
   {
-    description: "Send updated financial model to investors",
-    assignee: "You",
-    priority: "urgent",
-    status: "pending",
-    dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+    meetingId: meetingIds.kickoff.toString(),
+    userId,
+    description: "Set up UserSession architecture with all managers",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Isaiah",
+    dueDate: todayAt(12, 0),
+    createdAt: todayAt(9, 30),
   },
   {
-    description: "Schedule Series B kick-off meeting",
-    assignee: "You",
-    priority: "high",
-    status: "pending",
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+    meetingId: meetingIds.kickoff.toString(),
+    userId,
+    description: "Build TodayView with G1 status and transcript",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Aryan",
+    dueDate: todayAt(14, 0),
+    createdAt: todayAt(9, 30),
   },
   {
-    description: "Scope SSO implementation",
-    assignee: "John",
-    priority: "high",
-    status: "in_progress",
-    dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    meetingId: meetingIds.kickoff.toString(),
+    userId,
+    description: "Design clean horizontal status bar layout",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Parth",
+    dueDate: todayAt(11, 0),
+    createdAt: todayAt(9, 30),
   },
   {
-    description: "Finalize design system specs",
-    assignee: "Lisa",
-    priority: "medium",
-    status: "pending",
-    dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    meetingId: meetingIds.frontend.toString(),
+    userId,
+    description: "Implement useSSE hook with reconnection",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Aryan",
+    dueDate: todayAt(15, 0),
+    createdAt: todayAt(11, 45),
   },
   {
-    description: "Send custom proposal to Acme Corp",
-    assignee: "You",
-    priority: "high",
-    status: "pending",
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    meetingId: meetingIds.frontend.toString(),
+    userId,
+    description: "Add Framer Motion animations",
+    priority: "medium" as const,
+    status: "completed" as const,
+    assignee: "Aryan",
+    dueDate: todayAt(16, 0),
+    createdAt: todayAt(11, 45),
   },
   {
-    description: "Prepare Salesforce integration demo",
-    assignee: "Engineering",
-    priority: "medium",
-    status: "pending",
-    dueDate: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000),
+    meetingId: meetingIds.demo.toString(),
+    userId,
+    description: "Create demo voice command flow",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Isaiah",
+    dueDate: todayAt(17, 0),
+    createdAt: todayAt(16, 15),
+  },
+  {
+    meetingId: meetingIds.demo.toString(),
+    userId,
+    description: "Load seed data for demo",
+    priority: "high" as const,
+    status: "completed" as const,
+    assignee: "Aryan",
+    dueDate: todayAt(18, 0),
+    createdAt: todayAt(17, 35),
+  },
+  {
+    meetingId: meetingIds.demo.toString(),
+    userId,
+    description: "Test responsive design on projector",
+    priority: "medium" as const,
+    status: "completed" as const,
+    assignee: "Parth",
+    dueDate: todayAt(18, 0),
+    createdAt: todayAt(17, 35),
   },
 ];
 
-const DEMO_TRANSCRIPT_SEGMENTS = [
-  { text: "Good morning everyone, thanks for joining.", speakerHint: "You" },
-  {
-    text: "Let's start with a quick update on our Q1 numbers.",
-    speakerHint: "You",
-  },
-  {
-    text: "Revenue is looking really strong this quarter.",
-    speakerHint: "You",
-  },
-  {
-    text: "We hit 2.3 million in ARR, which is a 45% increase from last quarter.",
-    speakerHint: "You",
-  },
-  {
-    text: "That's impressive growth. How's the retention looking?",
-    speakerHint: "Sarah",
-  },
-  {
-    text: "Retention is at 94%, which is above industry average.",
-    speakerHint: "You",
-  },
-  {
-    text: "Great. What about the product roadmap for Q2?",
-    speakerHint: "Michael",
-  },
-  {
-    text: "We're focusing on enterprise features - SSO, audit logs, and improved APIs.",
-    speakerHint: "You",
-  },
-  {
-    text: "The AI meeting intelligence features are getting great feedback.",
-    speakerHint: "You",
-  },
-  {
-    text: "Can you demo the SEGA assistant?",
-    speakerHint: "Michael",
-  },
-  {
-    text: "Sure, let me show you how it works in real-time.",
-    speakerHint: "You",
-  },
-  {
-    text: "It automatically detects meetings and generates notes.",
-    speakerHint: "You",
-  },
-  {
-    text: "This is exactly what our portfolio companies need.",
-    speakerHint: "Sarah",
-  },
-  {
-    text: "Let's discuss the Series B timeline.",
-    speakerHint: "Sarah",
-  },
-  {
-    text: "We're thinking of starting the process in April.",
-    speakerHint: "You",
-  },
-  {
-    text: "Target raise is 15 to 20 million at an 80 to 100 million valuation.",
-    speakerHint: "You",
-  },
-  {
-    text: "That seems reasonable given your growth metrics.",
-    speakerHint: "Michael",
-  },
-  {
-    text: "We'll definitely want to participate in the round.",
-    speakerHint: "Sarah",
-  },
-  {
-    text: "Great, let's schedule a follow-up to kick off the process.",
-    speakerHint: "You",
-  },
-  {
-    text: "Action item - send the updated financial model by Friday.",
-    speakerHint: "You",
-  },
-  {
-    text: "Sounds good. Thanks for the update, this is exciting progress.",
-    speakerHint: "Michael",
-  },
-  { text: "Thanks everyone, talk soon.", speakerHint: "You" },
-];
-
-async function seedDatabase() {
-  if (skipDB) {
-    console.log("⏭️  Skipping database seeding (--skip-db flag)\n");
-    return;
-  }
-
-  console.log("1️⃣  Connecting to database...\n");
-
+async function seed() {
   try {
+    // Connect to database
+    console.log("📦 Connecting to database...");
     await connectDB();
-    if (!isDBConnected()) {
-      console.log(
-        "⚠️  Database not connected. Set MONGODB_URI to enable persistence.\n",
-      );
-      return;
+    console.log("✅ Connected!\n");
+
+    // Clear existing data for this user if requested
+    if (shouldClear) {
+      console.log("🗑️  Clearing existing data for user...");
+      await Promise.all([
+        MeetingModel.deleteMany({ userId }),
+        NoteModel.deleteMany({ userId }),
+        ActionItemModel.deleteMany({ userId }),
+        DailyTranscriptModel.deleteMany({ userId }),
+        ResearchResultModel.deleteMany({ userId }),
+      ]);
+      console.log("✅ Cleared!\n");
     }
-    console.log("✅ Database connected\n");
-  } catch (error) {
-    console.log("⚠️  Failed to connect to database:", error);
-    return;
-  }
 
-  console.log("2️⃣  Clearing existing demo data...\n");
+    // Create transcript for today
+    console.log("📝 Creating transcript segments...");
+    const dateStr = today.toISOString().split("T")[0];
 
-  try {
-    await MeetingModel.deleteMany({ userId });
-    await NoteModel.deleteMany({ userId });
-    await ActionItemModel.deleteMany({ userId });
-    await DailyTranscriptModel.deleteMany({ userId });
-    console.log("✅ Cleared existing data\n");
-  } catch (error) {
-    console.log("⚠️  Failed to clear data:", error);
-  }
+    // Delete existing transcript for today
+    await DailyTranscriptModel.deleteOne({ userId, date: dateStr });
 
-  console.log("3️⃣  Creating demo meetings...\n");
-
-  const createdMeetings: any[] = [];
-  for (const meetingData of DEMO_MEETINGS) {
-    try {
-      const meeting = await MeetingModel.create({
-        userId,
-        ...meetingData,
-        date: meetingData.startTime.toISOString().split("T")[0],
-        transcriptRange: {
-          startIndex: 0,
-          endIndex: 20,
-        },
-      });
-      createdMeetings.push(meeting);
-      console.log(`   ✅ Created meeting: ${meetingData.title}`);
-    } catch (error) {
-      console.log(
-        `   ❌ Failed to create meeting: ${meetingData.title}`,
-        error,
-      );
-    }
-  }
-  console.log("");
-
-  console.log("4️⃣  Creating demo notes...\n");
-
-  const createdNotes: any[] = [];
-  for (let i = 0; i < DEMO_NOTES.length; i++) {
-    const noteData = DEMO_NOTES[i];
-    const meeting = createdMeetings[i];
-
-    try {
-      const note = await NoteModel.create({
-        userId,
-        meetingId: meeting?._id,
-        ...noteData,
-        detailLevel: "detailed",
-        date:
-          meeting?.startTime?.toISOString().split("T")[0] ||
-          new Date().toISOString().split("T")[0],
-        timeRange: {
-          start: meeting?.startTime || new Date(),
-          end: meeting?.endTime || new Date(),
-        },
-      });
-      createdNotes.push(note);
-      console.log(`   ✅ Created note: ${noteData.title}`);
-    } catch (error) {
-      console.log(`   ❌ Failed to create note: ${noteData.title}`, error);
-    }
-  }
-  console.log("");
-
-  console.log("5️⃣  Creating demo action items...\n");
-
-  for (let i = 0; i < DEMO_ACTION_ITEMS.length; i++) {
-    const actionData = DEMO_ACTION_ITEMS[i];
-    const noteIndex = Math.floor(i / 2); // Distribute across notes
-    const note = createdNotes[noteIndex];
-    const meeting = createdMeetings[noteIndex];
-
-    try {
-      await ActionItemModel.create({
-        userId,
-        meetingId: meeting?._id,
-        noteId: note?._id,
-        ...actionData,
-      });
-      console.log(
-        `   ✅ Created action: ${actionData.description.substring(0, 40)}...`,
-      );
-    } catch (error) {
-      console.log(
-        `   ❌ Failed to create action: ${actionData.description}`,
-        error,
-      );
-    }
-  }
-  console.log("");
-
-  console.log("6️⃣  Creating demo transcript...\n");
-
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const segments = DEMO_TRANSCRIPT_SEGMENTS.map((seg, index) => ({
-      text: seg.text,
-      timestamp: new Date(
-        Date.now() - (DEMO_TRANSCRIPT_SEGMENTS.length - index) * 30000,
-      ),
-      isFinal: true,
-      speakerHint: seg.speakerHint,
-      index,
-    }));
-
-    await DailyTranscriptModel.create({
+    // Create new transcript
+    const transcriptDoc = new DailyTranscriptModel({
       userId,
-      date: today,
-      segments,
+      date: dateStr,
+      segments: TRANSCRIPT_SEGMENTS.map((seg, idx) => ({
+        index: idx,
+        text: seg.text,
+        timestamp: seg.time,
+        speakerHint: seg.speaker,
+        isFinal: true,
+      })),
+      updatedAt: new Date(),
     });
-    console.log(`   ✅ Created transcript with ${segments.length} segments\n`);
-  } catch (error) {
-    console.log("   ❌ Failed to create transcript:", error);
-  }
+    await transcriptDoc.save();
+    console.log(
+      `✅ Created ${TRANSCRIPT_SEGMENTS.length} transcript segments\n`,
+    );
 
-  console.log("✅ Database seeding complete!\n");
-}
+    // Create meetings
+    console.log("📅 Creating meetings...");
+    for (const meeting of MEETINGS) {
+      await MeetingModel.create(meeting);
+    }
+    console.log(`✅ Created ${MEETINGS.length} meetings\n`);
 
-async function sendDemoEmails() {
-  if (skipEmail) {
-    console.log("⏭️  Skipping email sending (--skip-email flag)\n");
-    return;
-  }
+    // Create notes
+    console.log("📋 Creating notes...");
+    for (const note of NOTES) {
+      await NoteModel.create(note);
+    }
+    console.log(`✅ Created ${NOTES.length} notes\n`);
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    console.log("⚠️  No RESEND_API_KEY set - skipping email\n");
-    return;
-  }
+    // Create action items
+    console.log("✅ Creating action items...");
+    for (const action of ACTION_ITEMS) {
+      await ActionItemModel.create(action);
+    }
+    console.log(`✅ Created ${ACTION_ITEMS.length} action items\n`);
 
-  console.log("7️⃣  Sending demo emails...\n");
+    // Send email with meeting summary
+    if (!skipEmail) {
+      console.log("📧 Sending meeting summary email...");
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (resendApiKey) {
+        const resend = new Resend(resendApiKey);
+        const fromEmail =
+          process.env.RESEND_FROM_EMAIL || "SEGA <onboarding@resend.dev>";
 
-  const resend = new Resend(resendApiKey);
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "SEGA <onboarding@resend.dev>";
-
-  // Email 1: Meeting Summary
-  try {
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: userId,
-      subject: "Meeting Summary: Q1 Investor Update",
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
-    .metric { background: white; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #667eea; }
-    .action-item { background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #f59e0b; }
-    .priority-urgent { border-left-color: #ef4444; }
-    .priority-high { border-left-color: #f59e0b; }
-    h1 { margin: 0; font-size: 24px; }
-    h2 { color: #374151; margin-top: 25px; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-    .badge-success { background: #d1fae5; color: #065f46; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>📋 Q1 Investor Update</h1>
-      <p style="margin: 10px 0 0 0; opacity: 0.9;">Meeting Summary from SEGA</p>
-    </div>
-    <div class="content">
-      <p><strong>Duration:</strong> 30 minutes &nbsp;|&nbsp; <strong>Attendees:</strong> Sarah Chen, Michael Park</p>
-
-      <h2>📊 Summary</h2>
-      <p>Productive investor update covering Q1 results. Revenue grew 45% QoQ to $2.3M ARR. Discussed Series B timeline and hiring plans for engineering team expansion.</p>
-
-      <h2>🎯 Key Metrics</h2>
-      <div class="metric">
-        <strong>ARR:</strong> $2.3M <span class="badge badge-success">↑45% QoQ</span>
-      </div>
-      <div class="metric">
-        <strong>User Retention:</strong> 94% (above industry average)
-      </div>
-
-      <h2>✅ Decisions Made</h2>
-      <ul>
-        <li>Proceed with Series B fundraising in April</li>
-        <li>Hire 5 senior engineers before end of Q2</li>
-        <li>Expand to European market in H2</li>
-      </ul>
-
-      <h2>📌 Action Items</h2>
-      <div class="action-item priority-urgent">
-        <strong>Send updated financial model</strong><br>
-        <small>Assignee: You &nbsp;|&nbsp; Due: Friday &nbsp;|&nbsp; <span style="color: #ef4444;">URGENT</span></small>
-      </div>
-      <div class="action-item priority-high">
-        <strong>Schedule Series B kick-off meeting</strong><br>
-        <small>Assignee: You &nbsp;|&nbsp; Due: Next week &nbsp;|&nbsp; <span style="color: #f59e0b;">HIGH</span></small>
-      </div>
-
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-      <p style="color: #6b7280; font-size: 12px; text-align: center;">
-        Generated by SEGA • Smart Executive Glasses Assistant<br>
-        <a href="#" style="color: #667eea;">View full notes</a> &nbsp;|&nbsp; <a href="#" style="color: #667eea;">Edit</a>
-      </p>
-    </div>
-  </div>
-</body>
-</html>
-      `,
-    });
-    console.log(`   ✅ Sent meeting summary email: ${result.data?.id}`);
-  } catch (error) {
-    console.log("   ❌ Failed to send meeting summary:", error);
-  }
-
-  // Email 2: Daily Digest
-  try {
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: userId,
-      subject: `SEGA Daily Digest - ${new Date().toLocaleDateString()}`,
-      html: `
+        try {
+          const result = await resend.emails.send({
+            from: fromEmail,
+            to: userId,
+            subject: "📋 Executive Lens Hackathon - Meeting Notes",
+            html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -588,195 +699,101 @@ async function sendDemoEmails() {
     .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
     .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
     .meeting-card { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
-    .stat { background: white; padding: 15px; border-radius: 8px; text-align: center; }
-    .stat-value { font-size: 28px; font-weight: bold; color: #10b981; }
-    .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
     h1 { margin: 0; font-size: 24px; }
-    .action-list { background: white; padding: 20px; border-radius: 8px; }
-    .action-item { padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-    .action-item:last-child { border-bottom: none; }
+    h2 { color: #374151; margin-top: 20px; font-size: 18px; }
+    h3 { margin: 0 0 8px 0; color: #1a1a1a; }
+    .meta { color: #6b7280; font-size: 14px; }
+    ul { margin: 10px 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+    .action { background: #d1fae5; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>📅 Your Daily Digest</h1>
-      <p style="margin: 10px 0 0 0; opacity: 0.9;">${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+      <h1>🚀 Executive Lens Hackathon</h1>
+      <p style="margin: 10px 0 0 0; opacity: 0.9;">Meeting Notes - ${new Date().toLocaleDateString()}</p>
     </div>
     <div class="content">
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-value">3</div>
-          <div class="stat-label">Meetings</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">6</div>
-          <div class="stat-label">Action Items</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">2.5h</div>
-          <div class="stat-label">Total Time</div>
-        </div>
-      </div>
-
-      <h2>📋 Today's Meetings</h2>
+      <p>Hey Isaiah! Here's a summary of today's hackathon building <strong>Executive Lens</strong> with Aryan and Parth.</p>
 
       <div class="meeting-card">
-        <h3 style="margin: 0 0 10px 0;">Q1 Investor Update</h3>
-        <p style="color: #6b7280; margin: 0;">9:00 AM • 30 min • investor_update</p>
-        <p style="margin: 10px 0 0 0;">Discussed Q1 results with Sequoia and a16z. Series B kick-off planned for April.</p>
+        <h3>🎯 Hackathon Kickoff (9:00 AM)</h3>
+        <p class="meta">Team: Isaiah, Aryan, Parth</p>
+        <h4>Key Decisions:</h4>
+        <ul>
+          <li>Product name: Executive Lens (codename SEGA)</li>
+          <li>Isaiah: Backend + AI integration</li>
+          <li>Aryan: Frontend with React + Framer Motion</li>
+          <li>Parth: UI/UX design</li>
+        </ul>
       </div>
 
       <div class="meeting-card">
-        <h3 style="margin: 0 0 10px 0;">Product Roadmap Planning</h3>
-        <p style="color: #6b7280; margin: 0;">11:00 AM • 1 hour • team_standup</p>
-        <p style="margin: 10px 0 0 0;">Q2 priorities set: Enterprise features, API v2, and design system overhaul.</p>
+        <h3>💻 Frontend Architecture Sync (11:30 AM)</h3>
+        <p class="meta">Deep dive into React components and SSE integration</p>
+        <ul>
+          <li>TodayView: Main dashboard with G1 status</li>
+          <li>useSSE hook for real-time updates</li>
+          <li>Framer Motion for smooth animations</li>
+        </ul>
       </div>
 
       <div class="meeting-card">
-        <h3 style="margin: 0 0 10px 0;">Client Demo - Acme Corp</h3>
-        <p style="color: #6b7280; margin: 0;">2:00 PM • 45 min • client_call</p>
-        <p style="margin: 10px 0 0 0;">Successful demo. They're interested in enterprise plan for 500 users.</p>
+        <h3>🧪 Demo Prep & Testing (4:00 PM)</h3>
+        <p class="meta">Final polish before presentation</p>
+        <ul>
+          <li>Added "send me meeting notes" voice command</li>
+          <li>Fixed transcript streaming bugs</li>
+          <li>Tested responsive design</li>
+        </ul>
       </div>
 
-      <h2>⚡ Pending Action Items</h2>
-      <div class="action-list">
-        <div class="action-item">
-          <strong>Send updated financial model to investors</strong>
-          <div style="color: #6b7280; font-size: 14px;">Due: 2 days • <span style="color: #ef4444;">URGENT</span></div>
-        </div>
-        <div class="action-item">
-          <strong>Send custom proposal to Acme Corp</strong>
-          <div style="color: #6b7280; font-size: 14px;">Due: 3 days • <span style="color: #f59e0b;">HIGH</span></div>
-        </div>
-        <div class="action-item">
-          <strong>Scope SSO implementation</strong>
-          <div style="color: #6b7280; font-size: 14px;">Assignee: John • In Progress</div>
-        </div>
-      </div>
+      <h2>✅ Completed Action Items</h2>
+      <div class="action">✓ Set up UserSession architecture</div>
+      <div class="action">✓ Build TodayView with G1 status</div>
+      <div class="action">✓ Design horizontal status bar</div>
+      <div class="action">✓ Implement useSSE hook</div>
+      <div class="action">✓ Add Framer Motion animations</div>
+      <div class="action">✓ Create demo voice command flow</div>
+      <div class="action">✓ Load seed data for demo</div>
+      <div class="action">✓ Test responsive design</div>
 
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-      <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      <p class="footer">
         Generated by SEGA • Smart Executive Glasses Assistant<br>
-        <a href="#" style="color: #10b981;">View all notes</a> &nbsp;|&nbsp; <a href="#" style="color: #10b981;">Manage preferences</a>
+        Built during the Executive Lens Hackathon 🎉
       </p>
     </div>
   </div>
 </body>
 </html>
-      `,
-    });
-    console.log(`   ✅ Sent daily digest email: ${result.data?.id}`);
-  } catch (error) {
-    console.log("   ❌ Failed to send daily digest:", error);
-  }
-
-  // Email 3: Research Results
-  try {
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: userId,
-      subject: "Research Results: Acme Corp",
-      html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }
-    .fact-card { background: white; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #8b5cf6; }
-    .source { background: white; padding: 15px; border-radius: 8px; margin: 10px 0; }
-    .source-title { color: #8b5cf6; font-weight: 600; text-decoration: none; }
-    h1 { margin: 0; font-size: 24px; }
-    h2 { color: #374151; margin-top: 25px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🔍 Research: Acme Corp</h1>
-      <p style="margin: 10px 0 0 0; opacity: 0.9;">Deep research triggered during your meeting</p>
-    </div>
-    <div class="content">
-      <h2>📊 Key Facts</h2>
-
-      <div class="fact-card">
-        <strong>Company Overview</strong><br>
-        Acme Corp is a Fortune 500 manufacturing company founded in 1952, headquartered in Chicago, IL.
-      </div>
-
-      <div class="fact-card">
-        <strong>Recent News</strong><br>
-        Announced digital transformation initiative in Q4 2024, investing $50M in enterprise software.
-      </div>
-
-      <div class="fact-card">
-        <strong>Key Contacts</strong><br>
-        CEO: John Smith • CTO: Sarah Johnson • VP Sales: Bob Williams
-      </div>
-
-      <div class="fact-card">
-        <strong>Financials</strong><br>
-        Revenue: $2.4B (2024) • Employees: 8,500 • Market Cap: $12B
-      </div>
-
-      <h2>📚 Sources</h2>
-
-      <div class="source">
-        <a href="#" class="source-title">Acme Corp - Wikipedia</a>
-        <p style="color: #6b7280; margin: 5px 0 0 0; font-size: 14px;">Acme Corporation is an American multinational manufacturing company...</p>
-      </div>
-
-      <div class="source">
-        <a href="#" class="source-title">Acme Corp Announces Digital Transformation - Reuters</a>
-        <p style="color: #6b7280; margin: 5px 0 0 0; font-size: 14px;">The company plans to invest $50M in modernizing their technology stack...</p>
-      </div>
-
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-      <p style="color: #6b7280; font-size: 12px; text-align: center;">
-        Generated by SEGA • Smart Executive Glasses Assistant<br>
-        Research powered by Firecrawl
-      </p>
-    </div>
-  </div>
-</body>
-</html>
-      `,
-    });
-    console.log(`   ✅ Sent research results email: ${result.data?.id}`);
-  } catch (error) {
-    console.log("   ❌ Failed to send research results:", error);
-  }
-
-  console.log("");
-}
-
-async function main() {
-  try {
-    await seedDatabase();
-    await sendDemoEmails();
-
-    if (!skipDB && isDBConnected()) {
-      await disconnectDB();
-      console.log("✅ Database disconnected\n");
+            `,
+          });
+          console.log(`✅ Email sent! ID: ${result.data?.id}\n`);
+        } catch (emailError) {
+          console.log(`⚠️  Failed to send email: ${emailError}\n`);
+        }
+      } else {
+        console.log("⚠️  No RESEND_API_KEY set - skipping email\n");
+      }
     }
 
     console.log("========================================");
-    console.log("🎉 Demo seed complete!");
+    console.log("🎉 Demo data seeded successfully!");
     console.log("========================================\n");
-    console.log("Next steps:");
-    console.log(`  1. Check email inbox at ${userId}`);
-    console.log("  2. Open the Notes page in the webview");
-    console.log("  3. You should see 3 meetings with notes");
-    console.log("  4. Check the Actions page for action items");
-    console.log("");
+    console.log("Summary:");
+    console.log(`  - ${TRANSCRIPT_SEGMENTS.length} transcript segments`);
+    console.log(`  - ${MEETINGS.length} meetings`);
+    console.log(`  - ${NOTES.length} notes`);
+    console.log(`  - ${ACTION_ITEMS.length} action items`);
+    console.log("\nReady for demo! 🚀\n");
   } catch (error) {
-    console.error("❌ Seed failed:", error);
+    console.error("❌ Error seeding data:", error);
     process.exit(1);
+  } finally {
+    await disconnectDB();
   }
 }
 
-main();
+seed();

@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { DailyFolder, Note as MockNote } from "../lib/mockData";
+import {
+  DailyFolder,
+  Note as MockNote,
+  TranscriptionSegment,
+} from "../lib/mockData";
 import { FolderList } from "../components/notes/FolderList";
 import { FolderDetail } from "../components/notes/FolderDetail";
 import { FileText, RefreshCw, Wifi, WifiOff } from "lucide-react";
@@ -46,6 +50,16 @@ export const NotesView: React.FC = () => {
           [],
           "Failed to load meetings from backend",
         );
+
+      // Fetch today's transcript
+      const { data: transcriptData } = await fetchWithFallback(
+        async () => {
+          const resp = await api.getTodayTranscript();
+          return resp;
+        },
+        { date: "", segments: [] },
+        "Failed to load transcript",
+      );
 
       const isMock = notesMock && meetingsMock;
 
@@ -140,6 +154,23 @@ export const NotesView: React.FC = () => {
               }
             });
 
+            // Transform transcript segments for this folder (only for today)
+            const folderTranscriptions: TranscriptionSegment[] = isToday(
+              dateObj,
+            )
+              ? (transcriptData.segments || []).map((seg: any) => ({
+                  id: `seg-${seg.index}`,
+                  time: seg.timestamp
+                    ? new Date(seg.timestamp).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "",
+                  text: seg.text,
+                  speaker: seg.speakerHint,
+                }))
+              : [];
+
             return {
               id: `folder-${date}`,
               date: dateObj,
@@ -147,7 +178,7 @@ export const NotesView: React.FC = () => {
               isTranscribing:
                 isToday(dateObj) && meetings.some((m) => m.status === "active"),
               isStarred: notes.some((n) => n.isStarred),
-              transcriptions: [], // Can be populated from transcript API if needed
+              transcriptions: folderTranscriptions,
               notes: transformedNotes,
               audio: [],
             };

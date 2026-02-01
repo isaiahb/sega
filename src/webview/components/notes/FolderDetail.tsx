@@ -1,26 +1,39 @@
-import React, { useState } from 'react';
-import { DailyFolder } from '../../lib/mockData';
-import { format } from 'date-fns';
-import { clsx } from 'clsx';
-import { FileText, MessageSquare, Sparkles, Star, X } from 'lucide-react';
-import { TranscriptionsTab } from '../tabs/TranscriptionsTab';
-import { NotesTab } from '../tabs/NotesTab';
-import { AIChatTab } from '../tabs/AIChatTab';
+import React, { useState } from "react";
+import { DailyFolder } from "../../lib/mockData";
+import { format } from "date-fns";
+import { clsx } from "clsx";
+import { FileText, MessageSquare, Sparkles, Star, X } from "lucide-react";
+import { TranscriptionsTab } from "../tabs/TranscriptionsTab";
+import { NotesTab } from "../tabs/NotesTab";
+import { AIChatTab } from "../tabs/AIChatTab";
 
 interface FolderDetailProps {
   folder: DailyFolder;
   onClose?: () => void;
 }
 
-type TabType = 'transcriptions' | 'notes' | 'ai';
+type TabType = "transcriptions" | "notes" | "ai";
 
-export const FolderDetail: React.FC<FolderDetailProps> = ({ folder, onClose }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('transcriptions');
+export const FolderDetail: React.FC<FolderDetailProps> = ({
+  folder,
+  onClose,
+}) => {
+  const [activeTab, setActiveTab] = useState<TabType>("notes");
 
   const tabs = [
-    { id: 'transcriptions' as const, label: 'Transcript', icon: MessageSquare, count: folder.transcriptions.length },
-    { id: 'notes' as const, label: 'Notes', icon: FileText, count: folder.notes.length },
-    { id: 'ai' as const, label: 'AI Chat', icon: Sparkles },
+    {
+      id: "transcriptions" as const,
+      label: "Transcript",
+      icon: MessageSquare,
+      count: folder.transcriptions.length,
+    },
+    {
+      id: "notes" as const,
+      label: "Notes",
+      icon: FileText,
+      count: folder.notes.length,
+    },
+    { id: "ai" as const, label: "AI Chat", icon: Sparkles },
   ];
 
   return (
@@ -31,7 +44,7 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folder, onClose }) =
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
-                {folder.isToday ? 'Today' : format(folder.date, 'EEEE, MMMM d')}
+                {folder.isToday ? "Today" : format(folder.date, "EEEE, MMMM d")}
               </h2>
               {folder.isStarred && (
                 <Star size={16} className="text-yellow-500 fill-yellow-500" />
@@ -44,7 +57,8 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folder, onClose }) =
               )}
             </div>
             <p className="text-sm text-zinc-500 mt-1">
-              {format(folder.date, 'yyyy')} • {folder.transcriptions.length} transcription segments
+              {format(folder.date, "yyyy")} • {folder.transcriptions.length}{" "}
+              transcription segments
             </p>
           </div>
 
@@ -68,18 +82,20 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folder, onClose }) =
                 "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
                 activeTab === tab.id
                   ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                  : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300",
               )}
             >
               <tab.icon size={16} />
               <span className="hidden sm:inline">{tab.label}</span>
               {tab.count !== undefined && (
-                <span className={clsx(
-                  "px-1.5 py-0.5 text-[10px] rounded-full font-bold",
-                  activeTab === tab.id
-                    ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
-                    : "bg-zinc-200/50 dark:bg-zinc-800 text-zinc-400"
-                )}>
+                <span
+                  className={clsx(
+                    "px-1.5 py-0.5 text-[10px] rounded-full font-bold",
+                    activeTab === tab.id
+                      ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
+                      : "bg-zinc-200/50 dark:bg-zinc-800 text-zinc-400",
+                  )}
+                >
                   {tab.count}
                 </span>
               )}
@@ -90,19 +106,17 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folder, onClose }) =
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'transcriptions' && (
+        {activeTab === "transcriptions" && (
           <div className="h-full overflow-y-auto">
             <TranscriptionsTab transcriptions={folder.transcriptions} />
           </div>
         )}
-        {activeTab === 'notes' && (
+        {activeTab === "notes" && (
           <div className="h-full overflow-y-auto">
             <NotesTab notes={folder.notes} />
           </div>
         )}
-        {activeTab === 'ai' && (
-          <AIChatTab date={folder.date} />
-        )}
+        {activeTab === "ai" && <AIChatTab date={folder.date} />}
       </div>
     </div>
   );

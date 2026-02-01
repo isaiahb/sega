@@ -31,6 +31,7 @@ import {
   SensitiveTopic as SensitiveTopicModel,
   getOrCreateUserSettings,
   UserSettings as UserSettingsModel,
+  DailyTranscript as DailyTranscriptModel,
 } from "../services/db";
 
 // Get config from environment
@@ -96,6 +97,18 @@ function requireAuth(c: Context): string | Response {
   return userId;
 }
 
+// Demo fallback - use hardcoded user if auth fails
+const DEMO_USER_ID = "isaiahballah@gmail.com";
+
+function requireAuthWithFallback(c: Context): string {
+  const userId = getUserId(c);
+  if (!userId) {
+    console.log("[Auth] Using demo fallback user:", DEMO_USER_ID);
+    return DEMO_USER_ID;
+  }
+  return userId;
+}
+
 function requireSession(
   c: Context,
 ): { userId: string; session: UserSession } | Response {
@@ -113,13 +126,16 @@ function requireSession(
 /**
  * Get session if available, otherwise just return userId for DB queries
  * This allows read operations to work even without active glasses connection
+ * Uses demo fallback if auth fails
  */
-function getSessionOrUserId(
-  c: Context,
-): { userId: string; session: UserSession | null } | Response {
-  const userId = getUserId(c);
+function getSessionOrUserId(c: Context): {
+  userId: string;
+  session: UserSession | null;
+} {
+  let userId = getUserId(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized" }, 401);
+    console.log("[Auth] Using demo fallback user:", DEMO_USER_ID);
+    userId = DEMO_USER_ID;
   }
   const session = UserSession.get(userId);
   return { userId, session };
@@ -201,9 +217,8 @@ api.get("/events", (c: Context) => {
  * GET /api/transcript/today - Get today's transcript
  */
 api.get("/transcript/today", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
+  const todayDate = new Date().toISOString().split("T")[0];
 
   // If session exists, get from memory
   if (session) {
@@ -214,9 +229,38 @@ api.get("/transcript/today", async (c: Context) => {
     });
   }
 
-  // No active session - return empty (or could query DB for historical)
+  // No active session - query database for most recent transcript (ignore date for demo)
+  try {
+    // First try today's date
+    let transcript = await DailyTranscriptModel.findOne({
+      userId,
+      date: todayDate,
+    });
+
+    // If no transcript for today, get the most recent one (timezone workaround for demo)
+    if (
+      !transcript ||
+      !transcript.segments ||
+      transcript.segments.length === 0
+    ) {
+      transcript = await DailyTranscriptModel.findOne({ userId })
+        .sort({ date: -1 })
+        .limit(1);
+    }
+
+    if (transcript && transcript.segments && transcript.segments.length > 0) {
+      return c.json({
+        date: todayDate, // Always report as "today" for the UI
+        segments: transcript.segments,
+      });
+    }
+  } catch (err) {
+    console.error("[API] Error fetching transcript from DB:", err);
+  }
+
+  // Return empty if nothing found
   return c.json({
-    date: new Date().toISOString().split("T")[0],
+    date: todayDate,
     segments: [],
   });
 });
@@ -225,9 +269,7 @@ api.get("/transcript/today", async (c: Context) => {
  * GET /api/transcript/recent - Get recent transcript
  */
 api.get("/transcript/recent", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const count = parseInt(c.req.query("count") || "50", 10);
   const finalOnly = c.req.query("finalOnly") !== "false";
@@ -255,9 +297,7 @@ api.get("/transcript/recent", async (c: Context) => {
  * GET /api/transcript/:date - Get transcript by date
  */
 api.get("/transcript/:date", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const date = c.req.param("date");
 
@@ -280,9 +320,7 @@ api.get("/transcript/:date", async (c: Context) => {
  * GET /api/transcript/:date/range - Get transcript range
  */
 api.get("/transcript/:date/range", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const date = c.req.param("date");
   const start = parseInt(c.req.query("start") || "0", 10);
@@ -311,9 +349,7 @@ api.get("/transcript/:date/range", async (c: Context) => {
  * GET /api/meetings - List meetings with filters
  */
 api.get("/meetings", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { userId, session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const date = c.req.query("date");
   const status = c.req.query("status");
@@ -367,9 +403,7 @@ api.get("/meetings", async (c: Context) => {
  * GET /api/meetings/active - Get active meeting
  */
 api.get("/meetings/active", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   if (!session) {
     return c.json({
@@ -400,9 +434,7 @@ api.get("/meetings/active", async (c: Context) => {
  * GET /api/meetings/recent - Get recent meetings
  */
 api.get("/meetings/recent", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   if (!session) {
     return c.json({
@@ -423,11 +455,14 @@ api.get("/meetings/recent", async (c: Context) => {
  * GET /api/meetings/:id - Get meeting by ID
  */
 api.get("/meetings/:id", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { userId, session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const meetingId = c.req.param("id");
+
+  if (!session) {
+    return c.json({ error: "No active session" }, 404);
+  }
+
   const meeting = await session.meeting.getMeetingById(meetingId);
 
   if (!meeting) {
@@ -527,8 +562,7 @@ api.post("/meetings/:id/process", async (c: Context) => {
  * GET /api/notes - List notes with filters
  */
 api.get("/notes", async (c: Context) => {
-  const userId = requireAuth(c);
-  if (userId instanceof Response) return userId;
+  const userId = requireAuthWithFallback(c);
 
   const date = c.req.query("date");
 
@@ -586,8 +620,7 @@ api.get("/notes", async (c: Context) => {
  * GET /api/notes/:id - Get note by ID
  */
 api.get("/notes/:id", async (c: Context) => {
-  const userId = requireAuth(c);
-  if (userId instanceof Response) return userId;
+  const userId = requireAuthWithFallback(c);
 
   const noteId = c.req.param("id");
 
@@ -612,8 +645,7 @@ api.get("/notes/:id", async (c: Context) => {
  * GET /api/notes/meeting/:meetingId - Get note by meeting ID
  */
 api.get("/notes/meeting/:meetingId", async (c: Context) => {
-  const userId = requireAuth(c);
-  if (userId instanceof Response) return userId;
+  const userId = requireAuthWithFallback(c);
 
   const meetingId = c.req.param("meetingId");
 
@@ -1101,9 +1133,7 @@ api.post("/research", async (c: Context) => {
  * GET /api/research/status - Check research availability
  */
 api.get("/research/status", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   if (!session) {
     return c.json({
@@ -1126,14 +1156,12 @@ api.get("/research/status", async (c: Context) => {
  * GET /api/research/:id - Get research result
  */
 api.get("/research/:id", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { userId, session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   const researchId = c.req.param("id");
 
   // Check session cache first
-  const cached = session.research.getResult(researchId);
+  const cached = session?.research.getResult(researchId);
   if (cached) {
     return c.json({
       id: cached._id,
@@ -1192,9 +1220,7 @@ api.get("/research/meeting/:meetingId", async (c: Context) => {
  * GET /api/research/results - Get all cached research results
  */
 api.get("/research/results", async (c: Context) => {
-  const result = getSessionOrUserId(c);
-  if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = getSessionOrUserId(c);
 
   if (!session) {
     return c.json({
