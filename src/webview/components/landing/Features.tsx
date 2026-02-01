@@ -17,7 +17,7 @@ export function Features() {
                 <h2 className="text-[11px] font-bold tracking-[0.2em] text-orange-600 uppercase mb-4">Core Functionality</h2>
                 <h3 className="text-4xl md:text-5xl lg:text-6xl font-bold text-zinc-900 leading-[1.05] tracking-tight">
                     A full stack executive assistant.<br/>
-                    <span className="text-zinc-400">Not two screens. One system.</span>
+                    {/* <span className="text-zinc-400">Not two screens. One system.</span> */}
                 </h3>
              </motion.div>
         </div>

@@ -54,14 +54,14 @@ export function Hero({ onNavigate }: HeroProps) {
                 className="flex flex-col sm:flex-row items-center gap-4 mb-8 w-full sm:w-auto"
             >
                 <button
-                  onClick={() => onNavigate?.('/app')}
+                  onClick={() => onNavigate?.('/onboarding')}
                   className="w-full sm:w-auto px-8 py-4 bg-zinc-900 text-white rounded-full font-bold hover:bg-zinc-800 transition-all hover:translate-y-[-1px] hover:shadow-xl active:translate-y-[1px] flex items-center justify-center gap-2 text-sm md:text-base"
                 >
                     See the demo
                     <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => onNavigate?.('/app')}
+                  onClick={() => onNavigate?.('/onboarding')}
                   className="w-full sm:w-auto px-8 py-4 bg-white border border-zinc-200 text-zinc-600 rounded-full font-bold hover:text-zinc-900 hover:border-zinc-300 transition-all active:scale-95 text-sm md:text-base"
                 >
                     Log in

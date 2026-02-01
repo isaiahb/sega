@@ -42,13 +42,13 @@ export function Navbar({ onNavigate }: NavbarProps) {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => onNavigate?.('/app')}
+            onClick={() => onNavigate?.('/onboarding')}
             className="hidden sm:block text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
           >
             Log in
           </button>
           <button
-            onClick={() => onNavigate?.('/app')}
+            onClick={() => onNavigate?.('/onboarding')}
             className="text-sm font-medium bg-zinc-900 text-white px-5 py-2.5 rounded-full hover:bg-zinc-800 transition-all shadow-lg hover:shadow-xl active:scale-95"
           >
             Get Started

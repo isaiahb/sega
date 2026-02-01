@@ -81,13 +81,13 @@ export function TechnicalCredibility({ onNavigate }: TechnicalCredibilityProps) 
                     className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
                 >
                     <button
-                        onClick={() => onNavigate?.('/app')}
+                        onClick={() => onNavigate?.('/onboarding')}
                         className="px-6 py-3 bg-white text-zinc-900 rounded-full font-bold hover:bg-zinc-100 transition-all shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto text-sm"
                     >
                         See the demo
                     </button>
                     <button
-                        onClick={() => onNavigate?.('/app')}
+                        onClick={() => onNavigate?.('/onboarding')}
                         className="px-6 py-3 bg-transparent border border-zinc-700 text-white rounded-full font-medium hover:bg-zinc-800 transition-all active:scale-95 w-full sm:w-auto text-sm"
                     >
                         Log in
