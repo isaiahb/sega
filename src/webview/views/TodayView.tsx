@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSSE } from '../hooks/useSSE';
+import { useSSE, type TranscriptEvent, type NotesReadyEvent, type ResearchStartedEvent, type ResearchProgressEvent, type StateUpdateEvent, type MeetingStartedEvent, type MeetingEndedEvent } from '../hooks/useSSE';
+import { api } from '../api/client';
 
 // Assets
 import glassesG1 from '../assets/glasses-g1.png';
@@ -247,13 +248,13 @@ const ResearchEntity = ({ type, title, subtitle, details, status }: ResearchItem
 };
 
 export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
-  const { lastEvent } = useSSE(userId);
+  const { lastEvent, isConnected } = useSSE(userId);
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Simulated Data
+  // State for data
   const [notes, setNotes] = useState<Note[]>([
       { time: "10:02", text: "Meeting started. Agenda: Pitch review for 'Lumina' (Generative UI Platform)." },
       { time: "10:03", text: "Speaker introduces himself as Alex Rivera." },
@@ -262,23 +263,99 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
 
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
   const [hudText, setHudText] = useState("");
+  const [meetingActive, setMeetingActive] = useState(false);
+  const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
 
-  // Handle SSE events for real transcription
+  // Handle all SSE events from backend
   useEffect(() => {
     if (!lastEvent) return;
 
     switch (lastEvent.type) {
-      case 'transcription':
-        if (lastEvent.isFinal) {
+      // Real-time transcription from glasses
+      case 'transcript': {
+        const event = lastEvent as TranscriptEvent;
+        if (event.isFinal) {
           const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-          setNotes(prev => [...prev, { time: timeStr, text: lastEvent.text }]);
+          setNotes(prev => [...prev, { time: timeStr, text: event.text }]);
         }
-        setHudText(lastEvent.text || "");
+        setHudText(event.text || "");
         break;
+      }
 
+      // State updates from backend
+      case 'state_update': {
+        const event = lastEvent as StateUpdateEvent;
+        setIsRecording(event.status === 'meeting_active');
+        setMeetingActive(event.status === 'meeting_active');
+        break;
+      }
+
+      // Meeting detected
+      case 'meeting_started': {
+        const event = lastEvent as MeetingStartedEvent;
+        setMeetingActive(true);
+        setCurrentMeetingId(event.meetingId);
+        setHudText(`Meeting Started\nType: ${event.classification?.category || 'General'}`);
+        break;
+      }
+
+      // Meeting ended - notes generation usually follows
+      case 'meeting_ended': {
+        const event = lastEvent as MeetingEndedEvent;
+        setMeetingActive(false);
+        setHudText("Meeting ended.\nProcessing notes...");
+        break;
+      }
+
+      // Notes are ready
+      case 'notes_ready': {
+        const event = lastEvent as NotesReadyEvent;
+        setHudText("Notes generated!\nAction items extracted.");
+        // Action items are included in the event
+        if (event.actionItems && event.actionItems.length > 0) {
+          event.actionItems.forEach(item => {
+            const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+            setNotes(prev => [...prev, { time: timeStr, text: `ACTION: ${item.task}` }]);
+          });
+        }
+        break;
+      }
+
+      // Research started
+      case 'research_started': {
+        const event = lastEvent as ResearchStartedEvent;
+        setHudText(`Researching: ${event.query}\nType: ${event.queryType}`);
+        break;
+      }
+
+      // Research in progress
+      case 'research_progress': {
+        const event = lastEvent as ResearchProgressEvent;
+        setHudText(`Research in progress...\n${event.message}`);
+        break;
+      }
+
+      // Research complete
+      case 'research_complete': {
+        const event = lastEvent as any; // ResearchCompleteEvent
+        if (event.results && event.results.length > 0) {
+          const firstResult = event.results[0];
+          setResearchItems(prev => [{
+            type: 'person',
+            title: firstResult.title,
+            subtitle: firstResult.url,
+            status: 'verified',
+            details: [firstResult.snippet || firstResult.content || 'Research completed']
+          }, ...prev]);
+        }
+        setHudText(`Research complete!\n${event.summary || 'Results available'}`);
+        break;
+      }
+
+      // Fallback for legacy agent_complete events
       case 'agent_complete':
-        if (lastEvent.response?.glassesDisplay) {
-          setHudText(lastEvent.response.glassesDisplay);
+        if ((lastEvent as any).response?.glassesDisplay) {
+          setHudText((lastEvent as any).response.glassesDisplay);
         }
         break;
     }
@@ -529,7 +606,22 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate, userId }) => {
                 {/* Footer - Controls */}
                 <div className="z-10 mt-2 min-w-0 shrink-0">
                      <button
-                        onClick={() => setIsRecording(!isRecording)}
+                        onClick={async () => {
+                          try {
+                            if (!isRecording) {
+                              await api.startRecording();
+                              setIsRecording(true);
+                            } else {
+                              await api.stopRecording();
+                              setIsRecording(false);
+                            }
+                          } catch (error) {
+                            console.error('Failed to toggle recording:', error);
+                            setHudText('Recording toggle failed. Check backend connection.');
+                            // Still toggle UI state as fallback
+                            setIsRecording(!isRecording);
+                          }
+                        }}
                         className={clsx(
                             "w-full py-3 px-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-sm text-sm border min-w-0",
                             isRecording
