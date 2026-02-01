@@ -801,8 +801,81 @@ export class DisplayManager {
   /**
    * Show error state
    */
-  showError(message: string): void {
+  showError(message: string) {
     this.showAlert(`❌ ${message}`);
+    this.updateDashboard(`❌ Error`);
+  }
+
+  // ===========================================================================
+  // Dashboard Status (Always-visible status on glasses)
+  // ===========================================================================
+
+  /**
+   * Update the dashboard with current agent status
+   * This is the always-visible status line when you look up
+   */
+  updateDashboard(status: string): void {
+    if (!this.appSession) return;
+
+    try {
+      // Use the dashboard API to write persistent status
+      if (this.appSession.dashboard?.write) {
+        this.appSession.dashboard.write({ text: status });
+        this.deps.logger.debug(`[DisplayManager] Dashboard: ${status}`);
+      }
+    } catch (err) {
+      // Dashboard may not be available on all devices
+      this.deps.logger.debug(
+        "[DisplayManager] Dashboard write failed (may not be supported)",
+      );
+    }
+
+    // Also broadcast to web UI
+    this.broadcastDisplayPreview([status]);
+  }
+
+  /**
+   * Show agent is idle/monitoring
+   */
+  showDashboardIdle(): void {
+    this.updateDashboard("SEGA • Monitoring");
+  }
+
+  /**
+   * Show agent is analyzing conversation
+   */
+  showDashboardAnalyzing(): void {
+    this.updateDashboard("SEGA • Analyzing...");
+  }
+
+  /**
+   * Show agent detected a meeting
+   */
+  showDashboardMeeting(title?: string): void {
+    const display = title ? `📋 ${title}` : "📋 In Meeting";
+    this.updateDashboard(display);
+  }
+
+  /**
+   * Show agent is researching
+   */
+  showDashboardResearching(query?: string): void {
+    const display = query ? `🔍 ${query.slice(0, 20)}...` : "🔍 Researching";
+    this.updateDashboard(display);
+  }
+
+  /**
+   * Show agent is generating notes
+   */
+  showDashboardGeneratingNotes(): void {
+    this.updateDashboard("📝 Generating notes...");
+  }
+
+  /**
+   * Clear dashboard status
+   */
+  clearDashboard(): void {
+    this.updateDashboard("");
   }
 
   // ===========================================================================

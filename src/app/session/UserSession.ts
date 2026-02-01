@@ -289,6 +289,18 @@ export class UserSession {
       this.initialized = true;
       this.logger.info("[UserSession] Initialized successfully");
 
+      // Notify any already-connected webview clients that a session is now active
+      // This uses broadcastToUser which sends to ALL clients for this userId
+      this.broadcast.broadcast({
+        type: "session_started",
+        userId: this.userId,
+        hasActiveSession: true,
+        timestamp: Date.now(),
+      });
+      this.logger.info(
+        "[UserSession] Broadcasted session_started to any waiting webview clients",
+      );
+
       // Show ready state on glasses
       this.display.showReady();
     } catch (error) {

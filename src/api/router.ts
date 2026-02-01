@@ -71,8 +71,21 @@ if (authMiddleware) {
 // ===========================================================================
 
 function getUserId(c: Context): string | null {
+  // First try SDK auth middleware (cookie-based)
   // @ts-ignore - Set by SDK auth middleware
-  return c.get("authUserId") as string | null;
+  const authUserId = c.get("authUserId") as string | null;
+  if (authUserId) {
+    return authUserId;
+  }
+
+  // Fallback: Check X-User-Id header (for dev/ngrok when cookies don't work)
+  const headerUserId = c.req.header("X-User-Id");
+  if (headerUserId) {
+    console.log(`[Auth] Using X-User-Id header: ${headerUserId}`);
+    return headerUserId;
+  }
+
+  return null;
 }
 
 function requireAuth(c: Context): string | Response {
@@ -94,6 +107,21 @@ function requireSession(
   if (!session) {
     return c.json({ error: "No active session" }, 404);
   }
+  return { userId, session };
+}
+
+/**
+ * Get session if available, otherwise just return userId for DB queries
+ * This allows read operations to work even without active glasses connection
+ */
+function getSessionOrUserId(
+  c: Context,
+): { userId: string; session: UserSession | null } | Response {
+  const userId = getUserId(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  const session = UserSession.get(userId);
   return { userId, session };
 }
 
@@ -140,11 +168,26 @@ api.get("/events", (c: Context) => {
   const queryUserId = c.req.query("userId");
   const userId = authUserId || queryUserId || "anonymous";
 
+  console.log(`[SSE] Connection request from userId: ${userId}`);
+  console.log(
+    `[SSE] Active sessions: ${JSON.stringify(UserSession.getActiveUserIds())}`,
+  );
+
   const session = UserSession.get(userId);
 
   if (session) {
+    console.log(
+      `[SSE] Found existing session for ${userId}, using session's broadcast manager`,
+    );
     return session.broadcast.createSSEResponse(c);
   }
+
+  // No session yet - create a temporary broadcast manager
+  // The frontend should reconnect when a session becomes available
+  console.log(
+    `[SSE] No session for ${userId}, creating temporary broadcast manager`,
+  );
+  console.log(`[SSE] Hint: Connect glasses to create a session for this user`);
 
   const broadcastManager = new BroadcastManager(userId);
   return broadcastManager.createSSEResponse(c);
@@ -158,15 +201,23 @@ api.get("/events", (c: Context) => {
  * GET /api/transcript/today - Get today's transcript
  */
 api.get("/transcript/today", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
 
-  const segments = session.transcript.getRecentSegments(undefined, true);
+  // If session exists, get from memory
+  if (session) {
+    const segments = session.transcript.getRecentSegments(undefined, true);
+    return c.json({
+      date: session.transcript.getCurrentDate(),
+      segments,
+    });
+  }
 
+  // No active session - return empty (or could query DB for historical)
   return c.json({
-    date: session.transcript.getCurrentDate(),
-    segments,
+    date: new Date().toISOString().split("T")[0],
+    segments: [],
   });
 });
 
@@ -174,20 +225,29 @@ api.get("/transcript/today", async (c: Context) => {
  * GET /api/transcript/recent - Get recent transcript
  */
 api.get("/transcript/recent", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
 
   const count = parseInt(c.req.query("count") || "50", 10);
   const finalOnly = c.req.query("finalOnly") !== "false";
 
-  const segments = session.transcript.getRecentSegments(count, finalOnly);
+  if (session) {
+    const segments = session.transcript.getRecentSegments(count, finalOnly);
+    return c.json({
+      success: true,
+      date: session.transcript.getCurrentDate(),
+      segments,
+      text: segments.map((s) => s.text).join(" "),
+    });
+  }
 
+  // No active session
   return c.json({
     success: true,
-    date: session.transcript.getCurrentDate(),
-    segments,
-    text: segments.map((s) => s.text).join(" "),
+    date: new Date().toISOString().split("T")[0],
+    segments: [],
+    text: "",
   });
 });
 
@@ -195,28 +255,32 @@ api.get("/transcript/recent", async (c: Context) => {
  * GET /api/transcript/:date - Get transcript by date
  */
 api.get("/transcript/:date", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
 
   const date = c.req.param("date");
-  const transcript = await session.transcript.getDailyTranscript(date);
 
-  if (!transcript) {
-    return c.json({ segments: [] });
+  if (session) {
+    const transcript = await session.transcript.getDailyTranscript(date);
+    if (!transcript) {
+      return c.json({ segments: [] });
+    }
+    return c.json({
+      date,
+      segments: transcript.segments,
+    });
   }
 
-  return c.json({
-    date,
-    segments: transcript.segments,
-  });
+  // No active session - return empty
+  return c.json({ date, segments: [] });
 });
 
 /**
  * GET /api/transcript/:date/range - Get transcript range
  */
 api.get("/transcript/:date/range", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
 
@@ -224,17 +288,19 @@ api.get("/transcript/:date/range", async (c: Context) => {
   const start = parseInt(c.req.query("start") || "0", 10);
   const end = parseInt(c.req.query("end") || "999999", 10);
 
-  const transcript = await session.transcript.getDailyTranscript(date);
-
-  if (!transcript) {
-    return c.json({ segments: [] });
+  if (session) {
+    const transcript = await session.transcript.getDailyTranscript(date);
+    if (!transcript) {
+      return c.json({ segments: [] });
+    }
+    const segments = transcript.segments.filter(
+      (s) => s.index >= start && s.index <= end,
+    );
+    return c.json({ segments });
   }
 
-  const segments = transcript.segments.filter(
-    (s) => s.index >= start && s.index <= end,
-  );
-
-  return c.json({ segments });
+  // No active session
+  return c.json({ segments: [] });
 });
 
 // ===========================================================================
@@ -245,34 +311,72 @@ api.get("/transcript/:date/range", async (c: Context) => {
  * GET /api/meetings - List meetings with filters
  */
 api.get("/meetings", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
   const date = c.req.query("date");
   const status = c.req.query("status");
 
-  let meetings;
-  if (date) {
-    meetings = await session.meeting.getMeetingsForDate(date);
-  } else {
-    meetings = session.meeting.getRecentMeetings();
+  // If we have an active session, use the meeting manager
+  if (session) {
+    let meetings;
+    if (date) {
+      meetings = await session.meeting.getMeetingsForDate(date);
+    } else {
+      meetings = session.meeting.getRecentMeetings();
+    }
+
+    if (status) {
+      meetings = meetings.filter((m) => m.status === status);
+    }
+
+    return c.json(meetings);
   }
 
-  if (status) {
-    meetings = meetings.filter((m) => m.status === status);
+  // No active session - query database directly
+  if (isDBConnected()) {
+    try {
+      const { Meeting: MeetingModel } = await import("../services/db");
+      const query: any = { userId };
+      if (date) {
+        query.date = date;
+      }
+      if (status) {
+        query.status = status;
+      }
+      const meetings = await MeetingModel.find(query)
+        .sort({ startTime: -1 })
+        .limit(50);
+      return c.json(
+        meetings.map((m) => ({
+          id: m._id?.toString(),
+          ...m.toObject(),
+        })),
+      );
+    } catch (error) {
+      console.error("[API] Meetings fetch error:", error);
+    }
   }
 
-  return c.json(meetings);
+  // Fallback: empty array
+  return c.json([]);
 });
 
 /**
  * GET /api/meetings/active - Get active meeting
  */
 api.get("/meetings/active", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  if (!session) {
+    return c.json({
+      success: true,
+      active: false,
+    });
+  }
 
   const meeting = session.meeting.getActiveMeeting();
 
@@ -296,9 +400,16 @@ api.get("/meetings/active", async (c: Context) => {
  * GET /api/meetings/recent - Get recent meetings
  */
 api.get("/meetings/recent", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  if (!session) {
+    return c.json({
+      success: true,
+      meetings: [],
+    });
+  }
 
   const meetings = session.meeting.getRecentMeetings();
 
@@ -312,9 +423,9 @@ api.get("/meetings/recent", async (c: Context) => {
  * GET /api/meetings/:id - Get meeting by ID
  */
 api.get("/meetings/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   const meetingId = c.req.param("id");
   const meeting = await session.meeting.getMeetingById(meetingId);
@@ -338,9 +449,10 @@ api.get("/meetings/:id", async (c: Context) => {
 });
 
 /**
- * POST /api/meetings/:id/end - End specific meeting
+ * POST /api/meetings/:id/end - End a meeting
  */
 api.post("/meetings/:id/end", async (c: Context) => {
+  // This operation requires an active session
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { session } = result;
@@ -381,9 +493,10 @@ api.post("/meetings/end", async (c: Context) => {
 });
 
 /**
- * POST /api/meetings/:id/process - Process meeting (generate notes)
+ * POST /api/meetings/:id/process - Trigger meeting processing
  */
 api.post("/meetings/:id/process", async (c: Context) => {
+  // This operation requires an active session
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { session } = result;
@@ -561,9 +674,10 @@ api.put("/notes/:id", async (c: Context) => {
 });
 
 /**
- * POST /api/notes/:id/generate-summary - Regenerate note summary
+ * POST /api/notes/:id/generate-summary - Regenerate notes summary
  */
 api.post("/notes/:id/generate-summary", async (c: Context) => {
+  // This operation requires an active session for LLM access
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
@@ -591,9 +705,10 @@ api.post("/notes/:id/generate-summary", async (c: Context) => {
 });
 
 /**
- * POST /api/notes/:id/email - Email note
+ * POST /api/notes/:id/email - Email a note
  */
 api.post("/notes/:id/email", async (c: Context) => {
+  // This operation requires an active session for email access
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
@@ -875,6 +990,7 @@ api.delete("/actions/:id", async (c: Context) => {
  * POST /api/research - Start research
  */
 api.post("/research", async (c: Context) => {
+  // This operation requires an active session
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { session } = result;
@@ -916,12 +1032,21 @@ api.post("/research", async (c: Context) => {
 });
 
 /**
- * GET /api/research/status - Get research status
+ * GET /api/research/status - Check research availability
  */
 api.get("/research/status", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  if (!session) {
+    return c.json({
+      success: true,
+      available: false,
+      isResearching: false,
+      activeResearch: null,
+    });
+  }
 
   return c.json({
     success: true,
@@ -932,10 +1057,10 @@ api.get("/research/status", async (c: Context) => {
 });
 
 /**
- * GET /api/research/:id - Get research by ID
+ * GET /api/research/:id - Get research result
  */
 api.get("/research/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
@@ -998,12 +1123,19 @@ api.get("/research/meeting/:meetingId", async (c: Context) => {
 });
 
 /**
- * GET /api/research/results - Get all research results
+ * GET /api/research/results - Get all cached research results
  */
 api.get("/research/results", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  if (!session) {
+    return c.json({
+      success: true,
+      results: [],
+    });
+  }
 
   return c.json({
     success: true,
@@ -1015,6 +1147,7 @@ api.get("/research/results", async (c: Context) => {
  * POST /api/research/quick - Quick research
  */
 api.post("/research/quick", async (c: Context) => {
+  // This operation requires an active session
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { session } = result;
@@ -1045,9 +1178,10 @@ api.post("/research/quick", async (c: Context) => {
 });
 
 /**
- * POST /api/research/scrape - Scrape URL
+ * POST /api/research/scrape - Scrape a URL
  */
 api.post("/research/scrape", async (c: Context) => {
+  // This operation requires an active session
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { session } = result;
@@ -1081,9 +1215,10 @@ api.post("/research/scrape", async (c: Context) => {
 });
 
 /**
- * POST /api/research/:id/email - Email research
+ * POST /api/research/:id/email - Email research result
  */
 api.post("/research/:id/email", async (c: Context) => {
+  // This operation requires an active session for email access
   const result = requireSession(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
@@ -1160,19 +1295,47 @@ api.post("/research/:id/email", async (c: Context) => {
  * GET /api/settings - Get user settings
  */
 api.get("/settings", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
-  // Get from session manager (which has defaults)
-  const settings = session.settings.getSettings();
+  // Default settings
+  const defaultSettings = {
+    autonomyLevel: "suggest",
+    showTranscriptOnGlasses: true,
+    emailSummaries: false,
+    emailAddress: null,
+  };
 
-  // Also try to get from database for persistence
+  // If we have an active session, get from session manager
+  if (session) {
+    const settings = session.settings.getSettings();
+
+    // Also try to get from database for persistence
+    if (isDBConnected()) {
+      try {
+        const dbSettings = await getOrCreateUserSettings(userId);
+        return c.json({
+          ...settings,
+          autonomyLevel: dbSettings.autonomyLevel,
+          showTranscriptOnGlasses: dbSettings.showTranscriptOnGlasses,
+          emailSummaries: dbSettings.emailSummaries,
+          emailAddress: dbSettings.emailAddress,
+        });
+      } catch (error) {
+        console.error("[API] Settings fetch error:", error);
+      }
+    }
+
+    return c.json(settings);
+  }
+
+  // No active session - query database directly
   if (isDBConnected()) {
     try {
       const dbSettings = await getOrCreateUserSettings(userId);
       return c.json({
-        ...settings,
+        ...defaultSettings,
         autonomyLevel: dbSettings.autonomyLevel,
         showTranscriptOnGlasses: dbSettings.showTranscriptOnGlasses,
         emailSummaries: dbSettings.emailSummaries,
@@ -1183,33 +1346,40 @@ api.get("/settings", async (c: Context) => {
     }
   }
 
-  return c.json(settings);
+  return c.json(defaultSettings);
 });
 
 /**
  * PUT /api/settings - Update user settings
  */
 api.put("/settings", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
   try {
     const body = await c.req.json();
 
-    // Update session settings
-    await session.settings.updateSettings(body);
+    // Update session settings if session exists
+    if (session) {
+      await session.settings.updateSettings(body);
+    }
 
     // Persist to database
     if (isDBConnected()) {
-      await UserSettingsModel.findOneAndUpdate(
+      const updated = await UserSettingsModel.findOneAndUpdate(
         { userId },
         { $set: body },
         { upsert: true, new: true },
       );
+      return c.json(updated?.toObject() || body);
     }
 
-    return c.json(session.settings.getSettings());
+    if (session) {
+      return c.json(session.settings.getSettings());
+    }
+
+    return c.json(body);
   } catch (error) {
     console.error("[API] Settings update error:", error);
     return c.json({ error: "Failed to update settings" }, 500);
@@ -1217,28 +1387,36 @@ api.put("/settings", async (c: Context) => {
 });
 
 /**
- * PATCH /api/settings - Update user settings (partial)
+ * PATCH /api/settings - Patch user settings
  */
 api.patch("/settings", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
   try {
     const body = await c.req.json();
-    await session.settings.updateSettings(body);
+
+    // Update session settings if session exists
+    if (session) {
+      await session.settings.updateSettings(body);
+    }
 
     if (isDBConnected()) {
-      await UserSettingsModel.findOneAndUpdate(
+      const updated = await UserSettingsModel.findOneAndUpdate(
         { userId },
         { $set: body },
         { upsert: true, new: true },
       );
+      return c.json({
+        success: true,
+        settings: updated?.toObject() || body,
+      });
     }
 
     return c.json({
       success: true,
-      settings: session.settings.getSettings(),
+      settings: session ? session.settings.getSettings() : body,
     });
   } catch (error) {
     console.error("[API] Settings update error:", error);
@@ -1251,77 +1429,148 @@ api.patch("/settings", async (c: Context) => {
 // ===========================================================================
 
 /**
- * GET /api/presets - List presets
+ * GET /api/presets - Get all presets
  */
 api.get("/presets", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
   const active = c.req.query("active");
 
-  // Get from session manager (has system presets)
-  let presets = session.settings.getPresets();
+  // If we have an active session, get from session manager (has system presets)
+  if (session) {
+    let presets = session.settings.getPresets();
 
-  if (active === "true") {
-    presets = presets.filter((p) => p.isActive !== false);
+    if (active === "true") {
+      presets = presets.filter((p) => p.isActive !== false);
+    }
+
+    return c.json(
+      presets.map((p) => ({
+        id: p._id,
+        ...p,
+      })),
+    );
   }
 
-  return c.json(
-    presets.map((p) => ({
-      id: p._id,
-      ...p,
-    })),
-  );
+  // No active session - query database directly
+  if (isDBConnected()) {
+    try {
+      const query: any = { userId };
+      if (active === "true") {
+        query.isActive = { $ne: false };
+      }
+      const presets = await PresetModel.find(query);
+      return c.json(
+        presets.map((p) => ({
+          id: p._id?.toString(),
+          ...p.toObject(),
+        })),
+      );
+    } catch (error) {
+      console.error("[API] Presets fetch error:", error);
+    }
+  }
+
+  // Return default system presets
+  return c.json([]);
 });
 
 /**
  * GET /api/presets/:id - Get preset by ID
  */
 api.get("/presets/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   const presetId = c.req.param("id");
-  const preset = session.settings.getPreset(presetId);
 
-  if (!preset) {
-    return c.json({ error: "Preset not found" }, 404);
+  // If we have an active session, use session manager
+  if (session) {
+    const preset = session.settings.getPreset(presetId);
+
+    if (!preset) {
+      return c.json({ error: "Preset not found" }, 404);
+    }
+
+    return c.json({
+      id: preset._id,
+      ...preset,
+    });
   }
 
-  return c.json({
-    id: preset._id,
-    ...preset,
-  });
+  // No active session - query database directly
+  if (isDBConnected()) {
+    try {
+      const preset = await PresetModel.findOne({ _id: presetId, userId });
+      if (preset) {
+        return c.json({
+          id: preset._id?.toString(),
+          ...preset.toObject(),
+        });
+      }
+    } catch (error) {
+      console.error("[API] Preset fetch error:", error);
+    }
+  }
+
+  return c.json({ error: "Preset not found" }, 404);
 });
 
 /**
  * POST /api/presets - Create preset
  */
 api.post("/presets", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { userId, session } = result;
 
   try {
     const body = await c.req.json();
 
-    const preset = await session.settings.addPreset({
-      name: body.name,
-      category: body.category,
-      condition: body.condition,
-      userContext: body.userContext,
-      noteRules: body.noteRules,
-      researchTriggers: body.researchTriggers,
-      sensitive: body.sensitive,
-      sensitiveReason: body.sensitiveReason,
-    });
+    // If we have an active session, use session manager
+    if (session) {
+      const preset = await session.settings.addPreset({
+        name: body.name,
+        category: body.category,
+        condition: body.condition,
+        userContext: body.userContext,
+        noteRules: body.noteRules,
+        researchTriggers: body.researchTriggers,
+        sensitive: body.sensitive,
+        sensitiveReason: body.sensitiveReason,
+      });
 
-    return c.json({
-      id: preset._id,
-      ...preset,
-    });
+      return c.json({
+        id: preset._id,
+        ...preset,
+      });
+    }
+
+    // No active session - create directly in database
+    if (isDBConnected()) {
+      const preset = await PresetModel.create({
+        userId,
+        name: body.name,
+        category: body.category,
+        condition: body.condition,
+        userContext: body.userContext,
+        noteRules: body.noteRules,
+        researchTriggers: body.researchTriggers,
+        sensitive: body.sensitive,
+        sensitiveReason: body.sensitiveReason,
+        isActive: true,
+      });
+
+      return c.json({
+        id: preset._id?.toString(),
+        ...preset.toObject(),
+      });
+    }
+
+    return c.json({ error: "Database not available" }, 503);
   } catch (error) {
     console.error("[API] Preset create error:", error);
     return c.json({ error: "Failed to create preset" }, 500);
@@ -1332,24 +1581,46 @@ api.post("/presets", async (c: Context) => {
  * PUT /api/presets/:id - Update preset
  */
 api.put("/presets/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   const presetId = c.req.param("id");
 
   try {
     const body = await c.req.json();
-    const updated = await session.settings.updatePreset(presetId, body);
 
-    if (!updated) {
-      return c.json({ error: "Preset not found" }, 404);
+    // If we have an active session, use session manager
+    if (session) {
+      const updated = await session.settings.updatePreset(presetId, body);
+
+      if (!updated) {
+        return c.json({ error: "Preset not found" }, 404);
+      }
+
+      return c.json({
+        id: updated._id,
+        ...updated,
+      });
     }
 
-    return c.json({
-      id: updated._id,
-      ...updated,
-    });
+    // No active session - update directly in database
+    if (isDBConnected()) {
+      const updated = await PresetModel.findOneAndUpdate(
+        { _id: presetId, userId },
+        { $set: body },
+        { new: true },
+      );
+
+      if (updated) {
+        return c.json({
+          id: updated._id?.toString(),
+          ...updated.toObject(),
+        });
+      }
+    }
+
+    return c.json({ error: "Preset not found" }, 404);
   } catch (error) {
     console.error("[API] Preset update error:", error);
     return c.json({ error: "Failed to update preset" }, 500);
@@ -1360,20 +1631,33 @@ api.put("/presets/:id", async (c: Context) => {
  * DELETE /api/presets/:id - Delete preset
  */
 api.delete("/presets/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   const presetId = c.req.param("id");
 
   try {
-    const deleted = await session.settings.removePreset(presetId);
+    // If we have an active session, use session manager
+    if (session) {
+      const deleted = await session.settings.removePreset(presetId);
 
-    if (!deleted) {
-      return c.json({ error: "Preset not found or is a system preset" }, 404);
+      if (!deleted) {
+        return c.json({ error: "Preset not found or is a system preset" }, 404);
+      }
+
+      return c.json({ success: true });
     }
 
-    return c.json({ success: true });
+    // No active session - delete directly from database
+    if (isDBConnected()) {
+      const result = await PresetModel.deleteOne({ _id: presetId, userId });
+      if (result.deletedCount > 0) {
+        return c.json({ success: true });
+      }
+    }
+
+    return c.json({ error: "Preset not found" }, 404);
   } catch (error) {
     console.error("[API] Preset delete error:", error);
     return c.json({ error: "Failed to delete preset" }, 500);
@@ -1385,30 +1669,50 @@ api.delete("/presets/:id", async (c: Context) => {
 // ===========================================================================
 
 /**
- * GET /api/sensitive-topics - List sensitive topics
+ * GET /api/sensitive-topics - Get sensitive topics
  */
 api.get("/sensitive-topics", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
-  const topics = session.settings.getSensitiveTopics();
+  // If we have an active session, use session manager
+  if (session) {
+    const topics = session.settings.getSensitiveTopics();
 
-  return c.json(
-    topics.map((t) => ({
-      id: t._id,
-      keyword: t.keyword,
-    })),
-  );
+    return c.json(
+      topics.map((t) => ({
+        id: t._id,
+        keyword: t.keyword,
+      })),
+    );
+  }
+
+  // No active session - query database directly
+  if (isDBConnected()) {
+    try {
+      const topics = await SensitiveTopicModel.find({ userId });
+      return c.json(
+        topics.map((t) => ({
+          id: t._id?.toString(),
+          keyword: t.keyword,
+        })),
+      );
+    } catch (error) {
+      console.error("[API] Sensitive topics fetch error:", error);
+    }
+  }
+
+  return c.json([]);
 });
 
 /**
  * POST /api/sensitive-topics - Add sensitive topic
  */
 api.post("/sensitive-topics", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   try {
     const body = await c.req.json();
@@ -1418,12 +1722,30 @@ api.post("/sensitive-topics", async (c: Context) => {
       return c.json({ error: "keyword is required" }, 400);
     }
 
-    const topic = await session.settings.addSensitiveTopic(keyword.trim());
+    // If we have an active session, use session manager
+    if (session) {
+      const topic = await session.settings.addSensitiveTopic(keyword.trim());
 
-    return c.json({
-      id: topic._id,
-      keyword: topic.keyword,
-    });
+      return c.json({
+        id: topic._id,
+        keyword: topic.keyword,
+      });
+    }
+
+    // No active session - create directly in database
+    if (isDBConnected()) {
+      const topic = await SensitiveTopicModel.create({
+        userId,
+        keyword: keyword.trim(),
+      });
+
+      return c.json({
+        id: topic._id?.toString(),
+        keyword: topic.keyword,
+      });
+    }
+
+    return c.json({ error: "Database not available" }, 503);
   } catch (error) {
     console.error("[API] Sensitive topic create error:", error);
     return c.json({ error: "Failed to add sensitive topic" }, 500);
@@ -1434,20 +1756,36 @@ api.post("/sensitive-topics", async (c: Context) => {
  * DELETE /api/sensitive-topics/:id - Remove sensitive topic
  */
 api.delete("/sensitive-topics/:id", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
 
   const topicId = c.req.param("id");
 
   try {
-    const deleted = await session.settings.removeSensitiveTopic(topicId);
+    // If we have an active session, use session manager
+    if (session) {
+      const deleted = await session.settings.removeSensitiveTopic(topicId);
 
-    if (!deleted) {
-      return c.json({ error: "Topic not found or is a system topic" }, 404);
+      if (!deleted) {
+        return c.json({ error: "Topic not found or is a system topic" }, 404);
+      }
+
+      return c.json({ success: true });
     }
 
-    return c.json({ success: true });
+    // No active session - delete directly from database
+    if (isDBConnected()) {
+      const result = await SensitiveTopicModel.deleteOne({
+        _id: topicId,
+        userId,
+      });
+      if (result.deletedCount > 0) {
+        return c.json({ success: true });
+      }
+    }
+
+    return c.json({ error: "Topic not found" }, 404);
   } catch (error) {
     console.error("[API] Sensitive topic delete error:", error);
     return c.json({ error: "Failed to remove sensitive topic" }, 500);
@@ -1462,9 +1800,29 @@ api.delete("/sensitive-topics/:id", async (c: Context) => {
  * GET /api/state - Get app state
  */
 api.get("/state", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
-  const { session } = result;
+  const { userId, session } = result;
+
+  console.log(`[API] /state request for userId: ${userId}`);
+  console.log(
+    `[API] Active sessions: ${JSON.stringify(UserSession.getActiveUserIds())}`,
+  );
+  console.log(`[API] Session found: ${!!session}`);
+
+  // If no active session, return idle state
+  if (!session) {
+    return c.json({
+      isRecording: false,
+      meetingState: "idle",
+      currentMeetingId: null,
+      hasActiveSession: false,
+      debug: {
+        requestedUserId: userId,
+        activeSessions: UserSession.getActiveUserIds(),
+      },
+    });
+  }
 
   const isInMeeting = session.meeting.isInMeeting();
   const activeMeeting = session.meeting.getActiveMeeting();
@@ -1481,6 +1839,7 @@ api.get("/state", async (c: Context) => {
     isRecording: true, // Always recording when session active
     meetingState,
     currentMeetingId: activeMeeting?._id,
+    hasActiveSession: true,
   });
 });
 
@@ -1488,9 +1847,19 @@ api.get("/state", async (c: Context) => {
  * POST /api/state/recording/start - Start recording
  */
 api.post("/state/recording/start", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  // If no active session, return current state
+  if (!session) {
+    return c.json({
+      isRecording: false,
+      meetingState: "idle",
+      currentMeetingId: null,
+      error: "No active glasses session. Connect your glasses first.",
+    });
+  }
 
   // Recording is always on when connected - this is a no-op for now
   return c.json({
@@ -1504,9 +1873,18 @@ api.post("/state/recording/start", async (c: Context) => {
  * POST /api/state/recording/stop - Stop recording
  */
 api.post("/state/recording/stop", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  // If no active session, return current state
+  if (!session) {
+    return c.json({
+      isRecording: false,
+      meetingState: "idle",
+      currentMeetingId: null,
+    });
+  }
 
   // End any active meeting
   if (session.meeting.isInMeeting()) {
@@ -1523,9 +1901,16 @@ api.post("/state/recording/stop", async (c: Context) => {
  * POST /api/state/glasses/transcript - Toggle glasses transcript
  */
 api.post("/state/glasses/transcript", async (c: Context) => {
-  const result = requireSession(c);
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
+
+  if (!session) {
+    return c.json({
+      success: false,
+      error: "No active glasses session",
+    });
+  }
 
   try {
     const body = await c.req.json();
@@ -1549,10 +1934,10 @@ api.post("/state/glasses/transcript", async (c: Context) => {
 // ===========================================================================
 
 /**
- * GET /api/settings/presets - Get presets (legacy)
+ * GET /api/debug/presets - Get all presets for debug
  */
-api.get("/settings/presets", async (c: Context) => {
-  const result = requireSession(c);
+api.get("/debug/presets", async (c: Context) => {
+  const result = getSessionOrUserId(c);
   if (result instanceof Response) return result;
   const { session } = result;
 

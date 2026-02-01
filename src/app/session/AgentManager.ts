@@ -35,7 +35,10 @@ export interface AgentManagerDeps {
     error: (message: string, ...args: unknown[]) => void;
   };
   transcript: {
-    getRecentSegments: (count?: number, finalOnly?: boolean) => TranscriptSegment[];
+    getRecentSegments: (
+      count?: number,
+      finalOnly?: boolean,
+    ) => TranscriptSegment[];
     getRecentText: (count?: number, finalOnly?: boolean) => string;
     getCurrentIndex: () => number;
   };
@@ -65,15 +68,19 @@ export interface AgentManagerDeps {
       sensitive?: boolean;
       sensitiveReason?: string;
     }>;
-    findMatchingPreset: (context: string) => {
-      _id?: string;
-      name: string;
-      category: MeetingCategory;
-      sensitive?: boolean;
-      sensitiveReason?: string;
-    } | undefined;
+    findMatchingPreset: (context: string) =>
+      | {
+          _id?: string;
+          name: string;
+          category: MeetingCategory;
+          sensitive?: boolean;
+          sensitiveReason?: string;
+        }
+      | undefined;
     getSensitiveKeywords: () => string[];
-    checkForSensitiveContent: (text: string) => { action: "pause" | "flag" } | null;
+    checkForSensitiveContent: (
+      text: string,
+    ) => { action: "pause" | "flag" } | null;
     getAutonomyLevel: () => "capture_only" | "suggest" | "act";
   };
   broadcast: {
@@ -81,9 +88,19 @@ export interface AgentManagerDeps {
     broadcast: (data: Record<string, unknown>) => void;
   };
   display: {
-    showMessage: (text: string, options?: { duration?: number; priority?: string }) => void;
+    showMessage: (
+      text: string,
+      options?: { duration?: number; priority?: string },
+    ) => void;
     showProcessing: () => void;
     showNotification: (text: string) => void;
+    // Dashboard status methods
+    showDashboardIdle: () => void;
+    showDashboardAnalyzing: () => void;
+    showDashboardMeeting: (title?: string) => void;
+    showDashboardResearching: (query?: string) => void;
+    showDashboardGeneratingNotes: () => void;
+    updateDashboard: (status: string) => void;
   };
   // Notes manager will be added when we create it
   notes?: {
@@ -100,6 +117,9 @@ const ANALYSIS_INTERVAL = 5000; // 5 seconds
 
 /** Minimum transcript length before running analysis */
 const MIN_TRANSCRIPT_LENGTH = 50;
+
+/** Feature flag: Enable sensitive topic detection (disabled for demo) */
+const ENABLE_SENSITIVE_TOPIC_DETECTION = false;
 
 /** Keywords that trigger immediate analysis */
 const TRIGGER_KEYWORDS = ["sega", "hey sega", "ok sega", "okay sega"];
@@ -192,7 +212,7 @@ export class AgentManager {
     } catch (error) {
       this.deps.logger.warn(
         "[AgentManager] No LLM provider available - analysis disabled",
-        error
+        error,
       );
     }
 
@@ -221,8 +241,37 @@ export class AgentManager {
 
     this.deps.broadcast.sendStateChange(previousState, newState);
     this.deps.logger.info(
-      `[AgentManager] State changed: ${previousState} -> ${newState}`
+      `[AgentManager] State changed: ${previousState} -> ${newState}`,
     );
+
+    // Update dashboard status based on state
+    this.updateDashboardForState(newState);
+  }
+
+  /**
+   * Update dashboard display based on current state
+   */
+  private updateDashboardForState(state: SessionState): void {
+    switch (state) {
+      case "idle":
+        this.deps.display.showDashboardIdle();
+        break;
+      case "detecting":
+        this.deps.display.updateDashboard("SEGA • Detecting...");
+        break;
+      case "in_meeting":
+        const meeting = this.deps.meeting.getActiveMeeting();
+        this.deps.display.showDashboardMeeting(meeting?.title);
+        break;
+      case "processing":
+        this.deps.display.showDashboardGeneratingNotes();
+        break;
+      case "researching":
+        this.deps.display.showDashboardResearching();
+        break;
+      default:
+        this.deps.display.showDashboardIdle();
+    }
   }
 
   /**
@@ -237,7 +286,9 @@ export class AgentManager {
    */
   pause(reason?: string): void {
     this.isPaused = true;
-    this.deps.logger.info(`[AgentManager] Paused${reason ? `: ${reason}` : ""}`);
+    this.deps.logger.info(
+      `[AgentManager] Paused${reason ? `: ${reason}` : ""}`,
+    );
   }
 
   /**
@@ -259,6 +310,9 @@ export class AgentManager {
     if (this.analysisTimer) return;
 
     this.deps.logger.info("[AgentManager] Starting analysis loop");
+
+    // Show initial dashboard status
+    this.deps.display.showDashboardIdle();
 
     this.analysisTimer = setInterval(() => {
       this.runAnalysisIfNeeded().catch((err) => {
@@ -288,16 +342,22 @@ export class AgentManager {
 
     // Check for immediate trigger keywords
     if (this.shouldTriggerImmediately(segment.text)) {
-      this.deps.logger.info("[AgentManager] Trigger keyword detected - running immediate analysis");
+      this.deps.logger.info(
+        "[AgentManager] Trigger keyword detected - running immediate analysis",
+      );
       this.runAnalysis().catch((err) => {
         this.deps.logger.error("[AgentManager] Immediate analysis error:", err);
       });
     }
 
-    // Check for sensitive content
-    const sensitiveCheck = this.deps.settings.checkForSensitiveContent(segment.text);
-    if (sensitiveCheck) {
-      this.handleSensitiveContent(segment.text, sensitiveCheck.action);
+    // Check for sensitive content (disabled for demo via feature flag)
+    if (ENABLE_SENSITIVE_TOPIC_DETECTION) {
+      const sensitiveCheck = this.deps.settings.checkForSensitiveContent(
+        segment.text,
+      );
+      if (sensitiveCheck) {
+        this.handleSensitiveContent(segment.text, sensitiveCheck.action);
+      }
     }
   }
 
@@ -362,21 +422,23 @@ export class AgentManager {
       ? `Currently in meeting: "${this.deps.meeting.getActiveMeeting()?.title}" (${this.deps.meeting.getActiveMeeting()?.category})`
       : "Not currently in a meeting";
 
-    const sensitiveKeywords = this.deps.settings.getSensitiveKeywords().slice(0, 20);
+    const sensitiveKeywords = this.deps.settings
+      .getSensitiveKeywords()
+      .slice(0, 20);
 
-    const prompt = MEETING_DETECTION_PROMPT
-      .replace("{{STATE}}", this.state)
+    const prompt = MEETING_DETECTION_PROMPT.replace("{{STATE}}", this.state)
       .replace("{{MEETING_INFO}}", meetingInfo)
       .replace("{{TRANSCRIPT}}", transcript)
-      .replace("{{SENSITIVE_KEYWORDS}}", sensitiveKeywords.join(", ") || "none configured");
+      .replace(
+        "{{SENSITIVE_KEYWORDS}}",
+        sensitiveKeywords.join(", ") || "none configured",
+      );
 
-    const messages: UnifiedMessage[] = [
-      { role: "user", content: prompt },
-    ];
+    const messages: UnifiedMessage[] = [{ role: "user", content: prompt }];
 
     try {
       const response = await this.provider.chat(messages, {
-        tier: "fast",
+        tier: "smart",
         maxTokens: 1024,
         temperature: 0.3,
       });
@@ -421,7 +483,10 @@ export class AgentManager {
         commands: parsed.commands || [],
       };
     } catch (error) {
-      this.deps.logger.error("[AgentManager] Failed to parse analysis response:", error);
+      this.deps.logger.error(
+        "[AgentManager] Failed to parse analysis response:",
+        error,
+      );
       return this.getEmptyAnalysisResult();
     }
   }
@@ -449,8 +514,8 @@ export class AgentManager {
   private async processAnalysisResult(result: AnalysisResult): Promise<void> {
     const autonomyLevel = this.deps.settings.getAutonomyLevel();
 
-    // Handle sensitive content
-    if (result.sensitiveDetected) {
+    // Handle sensitive content (disabled for demo via feature flag)
+    if (ENABLE_SENSITIVE_TOPIC_DETECTION && result.sensitiveDetected) {
       await this.handleSensitiveFromAnalysis(result);
     }
 
@@ -476,11 +541,11 @@ export class AgentManager {
   }
 
   /**
-   * Handle meeting detection
+   * Handle meeting detection - always auto-start meetings
    */
   private async handleMeetingDetected(
     result: AnalysisResult,
-    autonomyLevel: string
+    _autonomyLevel: string,
   ): Promise<void> {
     if (!result.classification) return;
 
@@ -490,41 +555,23 @@ export class AgentManager {
     const transcript = this.deps.transcript.getRecentText(20, true);
     const matchedPreset = this.deps.settings.findMatchingPreset(transcript);
 
-    if (autonomyLevel === "capture_only") {
-      // Just notify, don't start meeting
-      this.deps.display.showNotification(
-        `📋 Detected: ${result.classification.title}`
-      );
-      this.deps.broadcast.broadcast({
-        type: "meeting_detected",
+    // Broadcast that we're starting a meeting
+    this.deps.broadcast.broadcast({
+      type: "agent_activity",
+      activity: "meeting_detection",
+      message: `Detected meeting: ${result.classification.title}`,
+      data: {
         classification: result.classification,
         preset: matchedPreset?.name,
-      });
-      this.setState("idle");
-      return;
-    }
+      },
+    });
 
-    if (autonomyLevel === "suggest") {
-      // Notify and suggest
-      this.deps.display.showMessage(
-        `🎯 Start meeting?\n${result.classification.title}`,
-        { duration: 5000 }
-      );
-      this.deps.broadcast.broadcast({
-        type: "meeting_suggested",
-        classification: result.classification,
-        preset: matchedPreset?.name,
-      });
-      // Store for later confirmation
-      this.pendingCommands.push({
-        type: "start_meeting",
-        content: JSON.stringify(result.classification),
-      });
-      this.setState("idle");
-      return;
-    }
+    // Always auto-start meetings (no confirmation needed)
+    this.deps.display.showMessage(
+      `🎯 Meeting started\n${result.classification.title}`,
+      { duration: 3000 },
+    );
 
-    // Autonomy level is "act" - start meeting automatically
     await this.deps.meeting.startMeeting({
       title: result.classification.title,
       category: result.classification.category as MeetingCategory,
@@ -562,10 +609,12 @@ export class AgentManager {
   /**
    * Handle sensitive content from analysis
    */
-  private async handleSensitiveFromAnalysis(result: AnalysisResult): Promise<void> {
+  private async handleSensitiveFromAnalysis(
+    result: AnalysisResult,
+  ): Promise<void> {
     if (this.deps.meeting.isInMeeting()) {
       await this.deps.meeting.markAsSensitive(
-        result.sensitiveReason || "Sensitive content detected"
+        result.sensitiveReason || "Sensitive content detected",
       );
     }
 
@@ -598,10 +647,10 @@ export class AgentManager {
    */
   private async handleCommand(
     command: { type: string; content: string },
-    autonomyLevel: string
+    autonomyLevel: string,
   ): Promise<void> {
     this.deps.logger.info(
-      `[AgentManager] Processing command: ${command.type} - "${command.content}"`
+      `[AgentManager] Processing command: ${command.type} - "${command.content}"`,
     );
 
     if (autonomyLevel === "capture_only") {
@@ -622,7 +671,9 @@ export class AgentManager {
           } catch (error) {
             this.deps.logger.error("[AgentManager] Research failed:", error);
           }
-          this.setState(this.deps.meeting.isInMeeting() ? "in_meeting" : "idle");
+          this.setState(
+            this.deps.meeting.isInMeeting() ? "in_meeting" : "idle",
+          );
         }
         break;
 
@@ -645,7 +696,9 @@ export class AgentManager {
         break;
 
       default:
-        this.deps.logger.warn(`[AgentManager] Unknown command type: ${command.type}`);
+        this.deps.logger.warn(
+          `[AgentManager] Unknown command type: ${command.type}`,
+        );
     }
   }
 
@@ -658,7 +711,7 @@ export class AgentManager {
    */
   async manualStartMeeting(
     title: string,
-    category: MeetingCategory
+    category: MeetingCategory,
   ): Promise<void> {
     const preset = this.deps.settings.findMatchingPreset(title);
 

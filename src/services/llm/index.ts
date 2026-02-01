@@ -98,8 +98,8 @@ const providerRegistry: ProviderRegistry = {
  */
 export const DEFAULT_MODELS: Record<ProviderName, ModelConfig> = {
   anthropic: {
-    fast: "claude-haiku-4-5-20251001",
-    smart: "claude-sonnet-4-5-20250929",
+    fast: "claude-sonnet-4-5-20250929",
+    smart: "claude-opus-4-0-20250514",
   },
   gemini: {
     fast: "gemini-3-flash-preview",

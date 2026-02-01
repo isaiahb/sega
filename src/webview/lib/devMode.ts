@@ -19,24 +19,26 @@ export const isDevelopmentMode = import.meta.env.DEV;
  * Toggle with: localStorage.setItem('sega:forceMockData', 'true/false')
  */
 export const getForceMockDataMode = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('sega:forceMockData') === 'true';
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("sega:forceMockData") === "true";
 };
 
 /**
  * Toggle mock data mode
  */
 export const toggleForceMockDataMode = (): boolean => {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   const current = getForceMockDataMode();
   const newValue = !current;
   if (newValue) {
-    localStorage.setItem('sega:forceMockData', 'true');
+    localStorage.setItem("sega:forceMockData", "true");
   } else {
-    localStorage.removeItem('sega:forceMockData');
+    localStorage.removeItem("sega:forceMockData");
   }
   console.log(`[DEV] Mock data mode: ${newValue}`);
-  window.dispatchEvent(new CustomEvent('mockModeChanged', { detail: { enabled: newValue } }));
+  window.dispatchEvent(
+    new CustomEvent("mockModeChanged", { detail: { enabled: newValue } }),
+  );
   return newValue;
 };
 
@@ -51,7 +53,7 @@ export const toggleForceMockDataMode = (): boolean => {
 export async function fetchWithFallback<T>(
   apiFn: () => Promise<T>,
   mockData: T,
-  errorMessage: string = 'Failed to fetch data'
+  errorMessage: string = "Failed to fetch data",
 ): Promise<{ data: T; isMock: boolean }> {
   // If mock mode is forced, use mock data immediately
   if (getForceMockDataMode()) {
@@ -60,10 +62,23 @@ export async function fetchWithFallback<T>(
   }
 
   try {
+    console.log(`[API] Fetching: ${errorMessage.replace("Failed to ", "")}`);
     const data = await apiFn();
+    console.log(`[API] ✅ Success:`, data);
     return { data, isMock: false };
   } catch (error) {
-    console.warn(`${errorMessage}, falling back to mock data:`, error);
+    // Log detailed error information for debugging
+    const err = error as Error & { status?: number; statusText?: string };
+    console.group(`[API] ❌ ${errorMessage}`);
+    console.error("Error:", err.message || err);
+    if (err.status) {
+      console.error(`Status: ${err.status} ${err.statusText || ""}`);
+    }
+    if (error instanceof Response) {
+      console.error(`Response status: ${error.status} ${error.statusText}`);
+    }
+    console.log("Falling back to mock data");
+    console.groupEnd();
     return { data: mockData, isMock: true };
   }
 }
@@ -78,7 +93,7 @@ export async function fetchWithFallback<T>(
 export async function retryWithBackoff<T>(
   apiFn: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
@@ -91,14 +106,14 @@ export async function retryWithBackoff<T>(
         const delay = baseDelay * Math.pow(2, attempt);
         console.warn(
           `[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
-          error
+          error,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
 
-  throw lastError || new Error('All retries failed');
+  throw lastError || new Error("All retries failed");
 }
 
 /**
@@ -108,7 +123,7 @@ let callStats = new Map<string, { count: number; totalMs: number }>();
 
 export async function trackApiCall<T>(
   name: string,
-  apiFn: () => Promise<T>
+  apiFn: () => Promise<T>,
 ): Promise<T> {
   const start = performance.now();
   try {
@@ -180,16 +195,16 @@ export function getDevModeStatus() {
 export function setupDevModeShortcuts() {
   if (!isDevelopmentMode) return;
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener("keydown", (e) => {
     // Cmd+Shift+D: Toggle mock data mode
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyD') {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyD") {
       e.preventDefault();
       const enabled = toggleForceMockDataMode();
-      console.log(`Mock data mode: ${enabled ? 'ON' : 'OFF'}`);
+      console.log(`Mock data mode: ${enabled ? "ON" : "OFF"}`);
     }
 
     // Cmd+Shift+S: Show dev stats
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyS') {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyS") {
       e.preventDefault();
       console.table(getDevModeStatus());
     }
