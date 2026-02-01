@@ -108,8 +108,9 @@ Bun.serve({
     console: true,
   },
   routes: {
-    // Serve webview at root
+    // Serve webview at root and /app
     "/": isDevelopment ? indexDev : indexProd,
+    "/app": isDevelopment ? indexDev : indexProd,
     "/onboarding": isDevelopment ? indexDev : indexProd,
   },
   fetch(request) {
